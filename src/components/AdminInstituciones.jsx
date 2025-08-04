@@ -149,7 +149,7 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
         
         if (resultado.success) {
           alert('Institución actualizada exitosamente');
-          cargarInstituciones(); // Recargar datos
+          await cargarInstituciones(); // Recargar datos
         } else {
           alert('Error actualizando institución: ' + resultado.error);
         }
@@ -159,7 +159,7 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
         
         if (resultado.success) {
           alert('Institución creada exitosamente');
-          cargarInstituciones(); // Recargar datos
+          await cargarInstituciones(); // Recargar datos
         } else {
           alert('Error creando institución: ' + resultado.error);
         }
@@ -180,7 +180,7 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
         
         if (resultado.success) {
           alert('Institución eliminada exitosamente');
-          cargarInstituciones(); // Recargar datos
+          await cargarInstituciones(); // Recargar datos
         } else {
           alert('Error eliminando institución: ' + resultado.error);
         }
@@ -197,7 +197,7 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
       
       if (resultado.success) {
         alert(`Institución ${nuevoEstado === 'activo' ? 'activada' : 'bloqueada'} exitosamente`);
-        cargarInstituciones(); // Recargar datos
+        await cargarInstituciones(); // Recargar datos
       } else {
         alert('Error cambiando estado: ' + resultado.error);
       }
@@ -234,7 +234,7 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
       
       if (resultado.success) {
         alert('Usuario agregado exitosamente');
-        cargarInstituciones(); // Recargar datos
+        await cargarInstituciones(); // Recargar datos
         setShowUserForm(false);
         resetUserForm();
       } else {
@@ -255,7 +255,7 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
         
         if (resultado.success) {
           alert('Usuario eliminado exitosamente');
-          cargarInstituciones(); // Recargar datos
+          await cargarInstituciones(); // Recargar datos
         } else {
           alert('Error eliminando usuario: ' + resultado.error);
         }
@@ -274,7 +274,7 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
       
       if (resultado.success) {
         alert(`Usuario ${nuevoEstado === 'activo' ? 'activado' : 'desactivado'} exitosamente`);
-        cargarInstituciones(); // Recargar datos
+        await cargarInstituciones(); // Recargar datos
       } else {
         alert('Error cambiando estado: ' + resultado.error);
       }
