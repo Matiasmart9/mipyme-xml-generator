@@ -238,7 +238,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
         
         if (resultado.success) {
           alert('Cliente actualizado exitosamente');
-          cargarClientes(); // Recargar datos
+          await cargarClientes(); // Recargar datos
         } else {
           alert('Error actualizando cliente: ' + resultado.error);
         }
@@ -249,6 +249,13 @@ const Dashboard = ({ currentUser, onLogout }) => {
         if (resultado.success) {
           alert('Cliente guardado exitosamente');
           cargarClientes(); // Recargar datos
+        } else {
+          alert('Error guardando cliente: ' + resultado.error);
+        }
+
+        if (resultado.success) {
+          alert('Cliente guardado exitosamente');
+          await cargarClientes(); // Recargar datos
         } else {
           alert('Error guardando cliente: ' + resultado.error);
         }
@@ -576,7 +583,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                         const resultado = await eliminarCliente(currentUser.institucionId, persona.id);
                         if (resultado.success) {
                           alert('Cliente eliminado exitosamente');
-                          cargarClientes();
+                          await cargarClientes();
                         } else {
                           alert('Error eliminando cliente: ' + resultado.error);
                         }
