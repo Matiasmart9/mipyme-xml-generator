@@ -551,17 +551,17 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Actions Bar */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
           <button
             onClick={abrirFormulario}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center"
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center w-full sm:w-auto"
           >
             <Plus size={20} className="mr-2" />
             Nueva Institución
           </button>
           <button
             onClick={() => setShowExportModal(true)}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center"
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center w-full sm:w-auto"
           >
             <Download size={20} className="mr-2" />
             Exportar Cartera a Excel
