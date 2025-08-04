@@ -124,6 +124,27 @@ const Dashboard = ({ currentUser, onLogout }) => {
     { id: '2', label: 'Número' }
   ];
 
+  const departamentos = [
+    { id: '0', label: 'Sin especificar' },
+    { id: '1', label: 'Alto Paraguay' },
+    { id: '2', label: 'Alto Paraná' },
+    { id: '3', label: 'Amambay' },
+    { id: '4', label: 'Boquerón' },
+    { id: '5', label: 'Caaguazú' },
+    { id: '6', label: 'Caazapá' },
+    { id: '7', label: 'Canindeyú' },
+    { id: '8', label: 'Central' },
+    { id: '9', label: 'Concepción' },
+    { id: '10', label: 'Guairá' },
+    { id: '11', label: 'Itapúa' },
+    { id: '12', label: 'Cordillera' },
+    { id: '13', label: 'Misiones' },
+    { id: '14', label: 'Ñeembucú' },
+    { id: '15', label: 'Paraguarí' },
+    { id: '16', label: 'Presidente Hayes' },
+    { id: '17', label: 'San Pedro' }
+  ];
+
   const validarRUC = (ruc) => {
     if (currentPerson.idTipoDoc === '4') {
       // Formato flexible: al menos 1 dígito antes del guión, luego guión, luego 1 dígito
@@ -166,6 +187,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
       direccion: '',
       ciudad: '',
       barrio: '',
+      departamento: '8', // Central por defecto
       telefono: '',
       cargoTrabajo: '',
       salario: '',
@@ -278,6 +300,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
         direccion: '',
         ciudad: '',
         barrio: '',
+        departamento: '8', // Central por defecto
         telefono: '',
         cargoTrabajo: '',
         salario: '',
@@ -383,7 +406,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
 
       if (persona.direccion) {
         xml += `    <Direcciones Direccion_Libre="${persona.direccion} Ciudad: ${persona.ciudad} Barrio: ${persona.barrio}" `;
-        xml += `Calle="${persona.direccion}" IdPais="PY" IdDepartamento="0" `;
+        xml += `Calle="${persona.direccion}" IdPais="PY" IdDepartamento="${persona.departamento || '0'}" `;
         xml += `Ciudad="${persona.ciudad}" Barrio="${persona.barrio}" `;
         xml += `Telefono="${persona.telefono}" FechaRegistrada="${fechaInforme}" IdTipoDireccion="1" />\n`;
       }
@@ -548,7 +571,14 @@ const Dashboard = ({ currentUser, onLogout }) => {
                 <p className="text-sm text-gray-600">
                   {persona.idTipoDoc === '1' ? 'CI' : 'RUC'}: {persona.nroDoc}
                 </p>
-                <p className="text-sm text-gray-600">{persona.ciudad}</p>
+                <p className="text-sm text-gray-600">
+                {persona.ciudad}
+                {persona.departamento && persona.departamento !== '0' && (
+                  <span className="text-xs text-gray-500 ml-1">
+                    ({departamentos.find(d => d.id === persona.departamento)?.label})
+                  </span>
+                )}
+              </p>
                 <div className="mt-2 flex flex-wrap gap-1 text-xs">
                   <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
                     {persona.idTipoPersona === '1' ? 'Física' : 'Jurídica'}
@@ -906,6 +936,21 @@ const Dashboard = ({ currentUser, onLogout }) => {
                       className="w-full p-2 border rounded"
                       placeholder="Calle y número"
                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Departamento</label>
+                      <select
+                        value={currentPerson.departamento}
+                        onChange={(e) => setCurrentPerson({...currentPerson, departamento: e.target.value})}
+                        className="w-full p-2 border rounded"
+                      >
+                        {departamentos.map(depto => (
+                          <option key={depto.id} value={depto.id}>{depto.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
