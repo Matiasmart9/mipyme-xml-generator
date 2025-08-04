@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import { 
   Plus, 
   Search, 
@@ -11,7 +12,8 @@ import {
   EyeOff,
   Shield,
   ShieldOff,
-  LogOut
+  LogOut,
+  Download
 } from 'lucide-react';
 import {
   crearInstitucion,
@@ -21,7 +23,8 @@ import {
   crearUsuario,
   obtenerUsuarios,
   actualizarUsuario,
-  eliminarUsuario
+  eliminarUsuario,
+  obtenerClientes
 } from '../firebase/services';
 
 const AdminInstituciones = ({ currentUser, onLogout }) => {
@@ -31,6 +34,8 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showUserForm, setShowUserForm] = useState(false);
   const [institucionParaUsuario, setInstitucionParaUsuario] = useState(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [institucionParaExportar, setInstitucionParaExportar] = useState('todas');
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -304,6 +309,215 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
     return `px-2 py-1 rounded-full text-xs font-medium ${styles[estado]}`;
   };
 
+
+  // Función para exportar cartera de institución específica
+  const exportarCarteraInstitucion = async () => {
+    if (institucionParaExportar === '') {
+      alert('Seleccione una institución para exportar');
+      return;
+    }
+
+    alert('Generando reporte Excel... Esto puede tomar unos momentos.');
+
+    try {
+      const workbook = XLSX.utils.book_new();
+      let institucionesAExportar = [];
+
+      // Determinar qué instituciones exportar
+      if (institucionParaExportar === 'todas') {
+        institucionesAExportar = instituciones;
+      } else {
+        const institucionSeleccionada = instituciones.find(inst => inst.id === institucionParaExportar);
+        if (institucionSeleccionada) {
+          institucionesAExportar = [institucionSeleccionada];
+        }
+      }
+
+      const todosLosClientes = [];
+      const todasLasOperacionesActivas = [];
+      const todasLasOperacionesCanceladas = [];
+      const reporteAtrasos = [];
+
+      for (const institucion of institucionesAExportar) {
+        try {
+          const clientesResult = await obtenerClientes(institucion.id);
+          if (clientesResult.success && clientesResult.data.length > 0) {
+            
+            clientesResult.data.forEach(cliente => {
+              // 1. LISTA DE CLIENTES
+              todosLosClientes.push({
+                'Institución': institucion.nombre,
+                'ID Institución': institucion.idInstitucion,
+                'Cliente': cliente.nombreCompleto,
+                'Tipo Persona': cliente.idTipoPersona === '1' ? 'Física' : 'Jurídica',
+                'Documento': `${cliente.idTipoDoc === '1' ? 'CI' : 'RUC'}: ${cliente.nroDoc}`,
+                'Departamento': getDepartamentoLabel(cliente.departamento),
+                'Ciudad': cliente.ciudad || '',
+                'Dirección': cliente.direccion || '',
+                'Teléfono': cliente.telefono || '',
+                'Email': cliente.contactos?.find(c => c.idTipoContacto === '1')?.contacto || '',
+                'Operaciones Activas': cliente.operacionesActivas?.length || 0,
+                'Operaciones Canceladas': cliente.operacionesCanceladas?.length || 0
+              });
+
+              // 2. OPERACIONES ACTIVAS
+              if (cliente.operacionesActivas && cliente.operacionesActivas.length > 0) {
+                cliente.operacionesActivas.forEach(operacion => {
+                  todasLasOperacionesActivas.push({
+                    'Institución': institucion.nombre,
+                    'Cliente': cliente.nombreCompleto,
+                    'Documento': cliente.nroDoc,
+                    'Número Operación': operacion.numeroOperacion,
+                    'Tipo Operación': getTipoOperacionLabel(operacion.idTipoOperacion),
+                    'Fecha Operación': operacion.fechaOperacion,
+                    'Capital Original': `Gs. ${formatearMonto(operacion.capitalOriginal)}`,
+                    'Capital Adeudado': `Gs. ${formatearMonto(operacion.capitalAdeudadoActual)}`,
+                    'Plazo Total': operacion.plazoTotalEnPeriodos,
+                    'Plazo Remanente': operacion.plazoRemanenteEnPeriodos,
+                    'Días Atraso Actual': operacion.diasAtraso || 0,
+                    'Días Atraso Máximo': operacion.diasAtrasoMaximo || 0,
+                    'Días Atraso Promedio': operacion.diasAtrasoPromedio || 0,
+                    'Estado': operacion.diasAtraso > 0 ? 'CON ATRASO' : 'AL DÍA',
+                    'Moneda': operacion.idMoneda
+                  });
+
+                  // 3. REPORTE DE ATRASOS
+                  if (operacion.diasAtraso > 0 || operacion.diasAtrasoMaximo > 0) {
+                    reporteAtrasos.push({
+                      'Institución': institucion.nombre,
+                      'Cliente': cliente.nombreCompleto,
+                      'Documento': cliente.nroDoc,
+                      'Número Operación': operacion.numeroOperacion,
+                      'Capital Adeudado': `Gs. ${formatearMonto(operacion.capitalAdeudadoActual)}`,
+                      'Días Atraso Actual': operacion.diasAtraso || 0,
+                      'Días Atraso Máximo': operacion.diasAtrasoMaximo || 0,
+                      'Días Atraso Promedio': operacion.diasAtrasoPromedio || 0,
+                      'Categoría Riesgo': operacion.diasAtraso === 0 ? 'Sin Atraso' :
+                                        operacion.diasAtraso <= 30 ? 'Riesgo Bajo (1-30 días)' :
+                                        operacion.diasAtraso <= 60 ? 'Riesgo Medio (31-60 días)' :
+                                        operacion.diasAtraso <= 90 ? 'Riesgo Alto (61-90 días)' :
+                                        'Riesgo Crítico (+90 días)'
+                    });
+                  }
+                });
+              }
+
+              // 4. OPERACIONES CANCELADAS
+              if (cliente.operacionesCanceladas && cliente.operacionesCanceladas.length > 0) {
+                cliente.operacionesCanceladas.forEach(operacion => {
+                  todasLasOperacionesCanceladas.push({
+                    'Institución': institucion.nombre,
+                    'Cliente': cliente.nombreCompleto,
+                    'Documento': cliente.nroDoc,
+                    'Número Operación': operacion.numeroOperacion,
+                    'Tipo Operación': getTipoOperacionLabel(operacion.idTipoOperacion),
+                    'Fecha Operación': operacion.fechaOperacion,
+                    'Fecha Cancelación': operacion.fechaCancelacion,
+                    'Capital Original': `Gs. ${formatearMonto(operacion.capitalOriginal)}`,
+                    'Tipo Cancelación': operacion.idTipoCancelacion === '1' ? 'Anticipada' : 
+                                      operacion.idTipoCancelacion === '2' ? 'Con Mora' : 'Normal',
+                    'Días Atraso Máximo': operacion.diasAtrasoMaximo || 0,
+                    'Días Atraso Promedio': operacion.diasAtrasoPromedio || 0,
+                    'Moneda': operacion.idMoneda
+                  });
+                });
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`Error obteniendo clientes de ${institucion.nombre}:`, error);
+        }
+      }
+
+      // Crear las hojas del Excel
+      if (todosLosClientes.length > 0) {
+        const wsClientes = XLSX.utils.json_to_sheet(todosLosClientes);
+        XLSX.utils.book_append_sheet(workbook, wsClientes, 'Lista de Clientes');
+      }
+
+      if (todasLasOperacionesActivas.length > 0) {
+        const wsActivas = XLSX.utils.json_to_sheet(todasLasOperacionesActivas);
+        XLSX.utils.book_append_sheet(workbook, wsActivas, 'Operaciones Activas');
+      }
+
+      if (todasLasOperacionesCanceladas.length > 0) {
+        const wsCanceladas = XLSX.utils.json_to_sheet(todasLasOperacionesCanceladas);
+        XLSX.utils.book_append_sheet(workbook, wsCanceladas, 'Operaciones Canceladas');
+      }
+
+      if (reporteAtrasos.length > 0) {
+        const wsAtrasos = XLSX.utils.json_to_sheet(reporteAtrasos);
+        XLSX.utils.book_append_sheet(workbook, wsAtrasos, 'Reporte de Atrasos');
+      }
+
+      // Generar archivo
+      const fechaActual = new Date().toISOString().split('T')[0];
+      const nombreInstitucion = institucionParaExportar === 'todas' ? 'Todas_las_Instituciones' : 
+                                institucionesAExportar[0]?.nombre?.replace(/\s+/g, '_') || 'Institucion';
+      const nombreArchivo = `Cartera_${nombreInstitucion}_${fechaActual}.xlsx`;
+      
+      XLSX.writeFile(workbook, nombreArchivo);
+      
+      alert(`✅ Reporte generado: ${nombreArchivo}\n\n` +
+            `📊 Resumen:\n` +
+            `• ${todosLosClientes.length} clientes\n` +
+            `• ${todasLasOperacionesActivas.length} operaciones activas\n` +
+            `• ${todasLasOperacionesCanceladas.length} operaciones canceladas\n` +
+            `• ${reporteAtrasos.length} operaciones con atraso`);
+
+      setShowExportModal(false);
+
+    } catch (error) {
+      console.error('Error generando Excel:', error);
+      alert('Error generando el reporte Excel.');
+    }
+  };
+
+  // Funciones auxiliares para el Excel
+  const getDepartamentoLabel = (departamentoId) => {
+    const departamentos = [
+      { id: '0', label: 'Sin especificar' },
+      { id: '1', label: 'Alto Paraguay' },
+      { id: '2', label: 'Alto Paraná' },
+      { id: '3', label: 'Amambay' },
+      { id: '4', label: 'Boquerón' },
+      { id: '5', label: 'Caaguazú' },
+      { id: '6', label: 'Caazapá' },
+      { id: '7', label: 'Canindeyú' },
+      { id: '8', label: 'Central' },
+      { id: '9', label: 'Concepción' },
+      { id: '10', label: 'Guairá' },
+      { id: '11', label: 'Itapúa' },
+      { id: '12', label: 'Cordillera' },
+      { id: '13', label: 'Misiones' },
+      { id: '14', label: 'Ñeembucú' },
+      { id: '15', label: 'Paraguarí' },
+      { id: '16', label: 'Presidente Hayes' },
+      { id: '17', label: 'San Pedro' }
+    ];
+    return departamentos.find(d => d.id === departamentoId)?.label || 'Sin especificar';
+  };
+
+  const getTipoOperacionLabel = (tipoId) => {
+    const tipos = [
+      { id: '1', label: 'Préstamo Personal/Consumo' },
+      { id: '2', label: 'Préstamo Comercial' },
+      { id: '3', label: 'Préstamo Prendario' },
+      { id: '5', label: 'Préstamo Industrial o Sector Primario' },
+      { id: '6', label: 'Refinanciación o Reestructuración' },
+      { id: '8', label: 'Descuento de Cheques' },
+      { id: '9', label: 'Descuento de Pagarés' },
+      { id: '10', label: 'Descuento de Facturas (Factoring)' },
+      { id: '11', label: 'A plazo' },
+      { id: '95', label: 'Operación con Gestión de Cobro Judicial' }
+    ];
+    return tipos.find(t => t.id === tipoId)?.label || 'Desconocido';
+  };
+
+  const formatearMonto = (monto) => {
+    return new Intl.NumberFormat('es-PY').format(monto);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -337,15 +551,22 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Actions Bar */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={abrirFormulario}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center"
-            >
-              <Plus size={20} className="mr-2" />
-              Nueva Institución
-            </button>
-          </div>
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={abrirFormulario}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center"
+          >
+            <Plus size={20} className="mr-2" />
+            Nueva Institución
+          </button>
+          <button
+            onClick={() => setShowExportModal(true)}
+            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center"
+          >
+            <Download size={20} className="mr-2" />
+            Exportar Cartera a Excel
+          </button>
+        </div>
           
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -758,8 +979,77 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
               </div>
             </div>
           </div>
-        )}
+        )}        
       </div>
+
+      {/* Modal Exportar a Excel */}
+        {showExportModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full">
+              <div className="p-6">
+                <h2 className="text-xl font-bold mb-6 flex items-center">
+                  <Download className="mr-2" size={24} />
+                  Exportar Cartera a Excel
+                </h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Seleccionar Institución</label>
+                    <select
+                      value={institucionParaExportar}
+                      onChange={(e) => setInstitucionParaExportar(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="todas">📊 Todas las Instituciones</option>
+                      {instituciones.map(institucion => (
+                        <option key={institucion.id} value={institucion.id}>
+                          🏢 {institucion.nombre} (ID: {institucion.idInstitucion})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="font-medium text-blue-800 mb-2">📋 El reporte incluirá:</h3>
+                    <ul className="text-sm text-blue-700 space-y-1">
+                      <li>• Lista completa de clientes</li>
+                      <li>• Operaciones activas con días de atraso</li>
+                      <li>• Operaciones canceladas</li>
+                      <li>• Reporte detallado de atrasos por categoría</li>
+                    </ul>
+                  </div>
+
+                  {institucionParaExportar !== 'todas' && (
+                    <div className="bg-green-50 p-3 rounded-lg">
+                      <p className="text-sm text-green-700">
+                        📈 Se exportarán los datos de: <strong>
+                          {instituciones.find(i => i.id === institucionParaExportar)?.nombre}
+                        </strong>
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex space-x-4 mt-6">
+                  <button
+                    onClick={() => setShowExportModal(false)}
+                    className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={exportarCarteraInstitucion}
+                    className="flex-1 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 flex items-center justify-center"
+                  >
+                    <Download className="mr-2" size={16} />
+                    Generar Excel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
     </div>
   );
 };

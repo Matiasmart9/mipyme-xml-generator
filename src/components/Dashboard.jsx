@@ -324,15 +324,131 @@ const Dashboard = ({ currentUser, onLogout }) => {
     }
   }, [currentUser]);
 
+  // Función para actualizar días de atraso automáticamente y guardar en Firebase
+  const actualizarDiasAtrasoAutomatico = async (personas) => {
+    const personasActualizadas = [];
+
+    for (const persona of personas) {
+      let personaModificada = false;
+      const personaActualizada = { ...persona };
+
+      // Actualizar operaciones activas
+      if (personaActualizada.operacionesActivas && personaActualizada.operacionesActivas.length > 0) {
+        const operacionesActualizadas = personaActualizada.operacionesActivas.map(operacion => {
+          let operacionModificada = false;
+          const operacionActual = { ...operacion };
+
+          if (operacionActual.cuotas && operacionActual.cuotas.length > 0) {
+            const cuotasActualizadas = operacionActual.cuotas.map(cuota => {
+              const cuotaActual = { ...cuota };
+              
+              // Solo actualizar cuotas vencidas que no están pagadas
+              if (cuotaActual.estado === 'vencido' && cuotaActual.saldo > 0) {
+                const nuevoDiasAtraso = calcularDiasAtraso(cuotaActual.fechaVencimiento);
+                if (nuevoDiasAtraso !== cuotaActual.diasAtraso) {
+                  cuotaActual.diasAtraso = nuevoDiasAtraso;
+                  operacionModificada = true;
+                }
+              }
+              
+              return cuotaActual;
+            });
+
+            if (operacionModificada) {
+              operacionActual.cuotas = cuotasActualizadas;
+              
+              // Recalcular métricas de la operación
+              const metricas = calcularMetricasAtraso(cuotasActualizadas);
+              operacionActual.diasAtraso = metricas.diasAtraso;
+              operacionActual.diasAtrasoMaximo = metricas.diasAtrasoMaximo;
+              operacionActual.diasAtrasoPromedio = metricas.diasAtrasoPromedio;
+              
+              personaModificada = true;
+            }
+          }
+
+          return operacionActual;
+        });
+
+        if (personaModificada) {
+          personaActualizada.operacionesActivas = operacionesActualizadas;
+        }
+      }
+
+      // Si hubo modificaciones, guardar en Firebase
+      if (personaModificada) {
+        try {
+          await actualizarCliente(currentUser.institucionId, persona.id, personaActualizada);
+          console.log(`Días de atraso actualizados para cliente: ${persona.nombreCompleto}`);
+        } catch (error) {
+          console.error(`Error actualizando cliente ${persona.nombreCompleto}:`, error);
+        }
+      }
+
+      personasActualizadas.push(personaActualizada);
+    }
+
+    return personasActualizadas;
+  };
+
+  // Funciones auxiliares para cálculo de atraso (copiadas de OperacionesActivas)
+  const calcularDiasAtraso = (fechaVencimiento, fechaPago = null) => {
+    const fechaComparacion = fechaPago ? new Date(fechaPago) : new Date();
+    const vencimiento = new Date(fechaVencimiento);
+    const diferencia = fechaComparacion - vencimiento;
+    return diferencia > 0 ? Math.floor(diferencia / (1000 * 60 * 60 * 24)) : 0;
+  };
+
+  const calcularMetricasAtraso = (cuotas) => {
+    let diasAtrasoMaximo = 0;
+    let sumaDiasAtraso = 0;
+    let cantidadCuotasConAtraso = 0;
+    let diasAtrasoActual = 0;
+
+    const hoy = new Date();
+
+    cuotas.forEach(cuota => {
+      let diasAtrasoEfectivo = 0;
+
+      if (cuota.estado === 'pagado') {
+        diasAtrasoEfectivo = cuota.diasAtraso || 0;
+      } else if (cuota.estado === 'vencido') {
+        diasAtrasoEfectivo = calcularDiasAtraso(cuota.fechaVencimiento);
+        cuota.diasAtraso = diasAtrasoEfectivo;
+      }
+
+      if (diasAtrasoEfectivo > 0) {
+        diasAtrasoMaximo = Math.max(diasAtrasoMaximo, diasAtrasoEfectivo);
+        sumaDiasAtraso += diasAtrasoEfectivo;
+        cantidadCuotasConAtraso++;
+
+        if (cuota.estado === 'vencido') {
+          diasAtrasoActual = Math.max(diasAtrasoActual, diasAtrasoEfectivo);
+        }
+      }
+    });
+
+    const diasAtrasoPromedio = cantidadCuotasConAtraso > 0 ? 
+      Math.round(sumaDiasAtraso / cantidadCuotasConAtraso) : 0;
+
+    return { 
+      diasAtraso: diasAtrasoActual, 
+      diasAtrasoMaximo, 
+      diasAtrasoPromedio 
+    };
+  };
+
   const cargarClientes = async () => {
     try {
       const resultado = await obtenerClientes(currentUser.institucionId);
       if (resultado.success) {
-        setPersonas(resultado.data);
+        // Actualizar días de atraso antes de mostrar
+        const personasActualizadas = await actualizarDiasAtrasoAutomatico(resultado.data);
+        setPersonas(personasActualizadas);
         
         // Calcular contador global basado en operaciones existentes
         let maxCounter = 0;
-        resultado.data.forEach(persona => {
+        personasActualizadas.forEach(persona => {
           // Verificar operaciones activas
           if (persona.operacionesActivas) {
             persona.operacionesActivas.forEach(operacion => {
