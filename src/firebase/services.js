@@ -229,3 +229,132 @@ export const autenticarUsuario = async (email, password) => {
     return { success: false, error: error.message };
   }
 };
+
+// ====================== ADMINISTRADORES ======================
+
+export const crearAdministrador = async (adminData) => {
+  try {
+    const docRef = await addDoc(collection(db, "administradores"), {
+      ...adminData,
+      fechaCreacion: new Date().toISOString(),
+      fechaAlta: new Date().toISOString().split('T')[0],
+      role: 'admin'
+    });
+    return { success: true, id: docRef.id };
+  } catch (error) {
+    console.error("Error creando administrador:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const obtenerAdministradores = async () => {
+  try {
+    const querySnapshot = await getDocs(collection(db, "administradores"));
+    const administradores = [];
+    querySnapshot.forEach((doc) => {
+      administradores.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    return { success: true, data: administradores };
+  } catch (error) {
+    console.error("Error obteniendo administradores:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const actualizarAdministrador = async (adminId, datos) => {
+  try {
+    const docRef = doc(db, "administradores", adminId);
+    await updateDoc(docRef, datos);
+    return { success: true };
+  } catch (error) {
+    console.error("Error actualizando administrador:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const eliminarAdministrador = async (adminId) => {
+  try {
+    await deleteDoc(doc(db, "administradores", adminId));
+    return { success: true };
+  } catch (error) {
+    console.error("Error eliminando administrador:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+// Actualizar autenticación para incluir admins de Firebase
+export const autenticarUsuarioConAdmins = async (email, password) => {
+  try {
+    // 1. Verificar admin principal (hardcoded)
+    if (email === 'matiasmart7@gmail.com' && password === 'admin123') {
+      return {
+        success: true,
+        user: {
+          id: 'admin-principal',
+          email: 'matiasmart7@gmail.com',
+          nombre: 'Administrador Principal',
+          role: 'admin-principal',
+          institucionId: null
+        }
+      };
+    }
+
+    // 2. Verificar administradores en Firebase
+    const adminsSnapshot = await getDocs(collection(db, "administradores"));
+    for (let adminDoc of adminsSnapshot.docs) {
+      const adminData = adminDoc.data();
+      if (adminData.email === email && 
+          adminData.password === password && 
+          adminData.estado === 'activo') {
+        return {
+          success: true,
+          user: {
+            id: adminDoc.id,
+            email: adminData.email,
+            nombre: adminData.nombre,
+            role: 'admin',
+            institucionId: null
+          }
+        };
+      }
+    }
+
+    // 3. Verificar usuarios de instituciones
+    const institucionesSnapshot = await getDocs(collection(db, "instituciones"));
+    
+    for (let institucionDoc of institucionesSnapshot.docs) {
+      const institucionData = institucionDoc.data();
+      const usuariosSnapshot = await getDocs(
+        collection(db, "instituciones", institucionDoc.id, "usuarios")
+      );
+      
+      for (let usuarioDoc of usuariosSnapshot.docs) {
+        const usuarioData = usuarioDoc.data();
+        if (usuarioData.email === email && 
+            usuarioData.password === password && 
+            usuarioData.estado === 'activo' &&
+            institucionData.estado === 'activo') {
+          return {
+            success: true,
+            user: {
+              id: usuarioDoc.id,
+              email: usuarioData.email,
+              nombre: usuarioData.nombre,
+              role: 'user',
+              institucionId: institucionData.idInstitucion,
+              institucionNombre: institucionData.nombre
+            }
+          };
+        }
+      }
+    }
+    
+    return { success: false, error: 'Credenciales incorrectas o usuario inactivo' };
+  } catch (error) {
+    console.error("Error en autenticación:", error);
+    return { success: false, error: error.message };
+  }
+};

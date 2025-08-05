@@ -24,7 +24,11 @@ import {
   obtenerUsuarios,
   actualizarUsuario,
   eliminarUsuario,
-  obtenerClientes
+  obtenerClientes,
+  crearAdministrador,
+  obtenerAdministradores,
+  actualizarAdministrador,
+  eliminarAdministrador
 } from '../firebase/services';
 
 const AdminInstituciones = ({ currentUser, onLogout }) => {
@@ -36,6 +40,15 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
   const [institucionParaUsuario, setInstitucionParaUsuario] = useState(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [institucionParaExportar, setInstitucionParaExportar] = useState('todas');
+  const [administradores, setAdministradores] = useState([]);
+  const [showAdminForm, setShowAdminForm] = useState(false);
+  const [editingAdminIndex, setEditingAdminIndex] = useState(null);
+  const [newAdmin, setNewAdmin] = useState({
+    nombre: '',
+    email: '',
+    password: '',
+    estado: 'activo'
+  });
 
   const [formData, setFormData] = useState({
     nombre: '',
@@ -56,10 +69,14 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
 
   const [showPasswords, setShowPasswords] = useState({});
 
-  // Cargar instituciones y usuarios desde Firebase
+  // Cargar instituciones, usuarios y administradores desde Firebase
   useEffect(() => {
     cargarInstituciones();
-  }, []);
+    // Solo cargar administradores si es admin principal
+    if (currentUser.role === 'admin-principal') {
+      cargarAdministradores();
+    }
+  }, [currentUser]);
 
   const cargarInstituciones = async () => {
     const resultado = await obtenerInstituciones();
@@ -518,6 +535,122 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
     return new Intl.NumberFormat('es-PY').format(monto);
   };
 
+  // ====================== FUNCIONES PARA ADMINISTRADORES ======================
+
+  const cargarAdministradores = async () => {
+    const resultado = await obtenerAdministradores();
+    if (resultado.success) {
+      setAdministradores(resultado.data);
+    } else {
+      console.error('Error cargando administradores:', resultado.error);
+    }
+  };
+
+  const resetAdminForm = () => {
+    setNewAdmin({
+      nombre: '',
+      email: '',
+      password: '',
+      estado: 'activo'
+    });
+    setEditingAdminIndex(null);
+  };
+
+  const abrirFormularioAdmin = () => {
+    resetAdminForm();
+    setShowAdminForm(true);
+  };
+
+  const editarAdmin = (index) => {
+    setNewAdmin({...administradores[index]});
+    setEditingAdminIndex(index);
+    setShowAdminForm(true);
+  };
+
+  const agregarAdmin = async () => {
+    if (!newAdmin.nombre || !newAdmin.email || !newAdmin.password) {
+      alert('Todos los campos son requeridos');
+      return;
+    }
+
+    // Verificar que el email no exista
+    const emailExiste = administradores.some(admin => admin.email === newAdmin.email);
+    if (emailExiste && editingAdminIndex === null) {
+      alert('Este email ya está registrado como administrador');
+      return;
+    }
+
+    // Verificar que no sea el admin principal
+    if (newAdmin.email === 'matiasmart7@gmail.com') {
+      alert('No se puede crear un administrador con este email');
+      return;
+    }
+
+    try {
+      if (editingAdminIndex !== null) {
+        // Actualizar admin existente
+        const adminId = administradores[editingAdminIndex].id;
+        const resultado = await actualizarAdministrador(adminId, newAdmin);
+        
+        if (resultado.success) {
+          alert('Administrador actualizado exitosamente');
+          await cargarAdministradores();
+        } else {
+          alert('Error actualizando administrador: ' + resultado.error);
+        }
+      } else {
+        // Crear nuevo admin
+        const resultado = await crearAdministrador(newAdmin);
+        
+        if (resultado.success) {
+          alert('Administrador creado exitosamente');
+          await cargarAdministradores();
+        } else {
+          alert('Error creando administrador: ' + resultado.error);
+        }
+      }
+
+      setShowAdminForm(false);
+      resetAdminForm();
+    } catch (error) {
+      alert('Error de conexión: ' + error.message);
+    }
+  };
+
+  const eliminarAdmin = async (index) => {
+    if (window.confirm('¿Está seguro de eliminar este administrador?')) {
+      try {
+        const adminId = administradores[index].id;
+        const resultado = await eliminarAdministrador(adminId);
+        
+        if (resultado.success) {
+          alert('Administrador eliminado exitosamente');
+          await cargarAdministradores();
+        } else {
+          alert('Error eliminando administrador: ' + resultado.error);
+        }
+      } catch (error) {
+        alert('Error de conexión: ' + error.message);
+      }
+    }
+  };
+
+  const cambiarEstadoAdmin = async (index, nuevoEstado) => {
+    try {
+      const adminId = administradores[index].id;
+      const resultado = await actualizarAdministrador(adminId, { estado: nuevoEstado });
+      
+      if (resultado.success) {
+        alert(`Administrador ${nuevoEstado === 'activo' ? 'activado' : 'desactivado'} exitosamente`);
+        await cargarAdministradores();
+      } else {
+        alert('Error cambiando estado: ' + resultado.error);
+      }
+    } catch (error) {
+      alert('Error de conexión: ' + error.message);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -552,21 +685,30 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
         {/* Actions Bar */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
         <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4">
+        <button
+          onClick={abrirFormulario}
+          className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center w-full sm:w-auto"
+        >
+          <Plus size={20} className="mr-2" />
+          Nueva Institución
+        </button>
+        <button
+          onClick={() => setShowExportModal(true)}
+          className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center w-full sm:w-auto"
+        >
+          <Download size={20} className="mr-2" />
+          Exportar Cartera a Excel
+        </button>
+        {currentUser.role === 'admin-principal' && (
           <button
-            onClick={abrirFormulario}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 flex items-center w-full sm:w-auto"
+            onClick={abrirFormularioAdmin}
+            className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 flex items-center w-full sm:w-auto"
           >
-            <Plus size={20} className="mr-2" />
-            Nueva Institución
+            <Users size={20} className="mr-2" />
+            Gestionar Admins
           </button>
-          <button
-            onClick={() => setShowExportModal(true)}
-            className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center w-full sm:w-auto"
-          >
-            <Download size={20} className="mr-2" />
-            Exportar Cartera a Excel
-          </button>
-        </div>
+        )}
+      </div>
           
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
@@ -581,7 +723,7 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
         </div>
 
         {/* Estadísticas */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow">
             <div className="flex items-center">
               <Building2 className="text-blue-600" size={24} />
@@ -624,6 +766,19 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
               </div>
             </div>
           </div>
+          {currentUser.role === 'admin-principal' && (
+            <div className="bg-white p-6 rounded-lg shadow">
+              <div className="flex items-center">
+                <Shield className="text-indigo-600" size={24} />
+                <div className="ml-4">
+                  <p className="text-sm font-medium text-gray-500">Administradores</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {administradores.length + 1} {/* +1 por el admin principal */}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Lista de Instituciones */}
@@ -788,6 +943,91 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
             </div>
           )}
         </div>
+
+        {/* Sección de Administradores - Solo para admin principal */}
+        {currentUser.role === 'admin-principal' && (
+          <div className="bg-white shadow rounded-lg mb-8">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900 flex items-center">
+                <Users className="mr-2" size={20} />
+                Administradores ({administradores.length})
+              </h2>
+            </div>
+            
+            <div className="divide-y divide-gray-200">
+              {administradores.map((admin, index) => (
+                <div key={admin.id} className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        <h3 className="text-lg font-medium text-gray-900 mr-3">
+                          {admin.nombre}
+                        </h3>
+                        <span className={getEstadoBadge(admin.estado)}>
+                          {admin.estado.charAt(0).toUpperCase() + admin.estado.slice(1)}
+                        </span>
+                      </div>
+                      
+                      <div className="text-sm text-gray-600">
+                        <p><strong>Email:</strong> {admin.email}</p>
+                        <p><strong>Fecha de Alta:</strong> {admin.fechaAlta}</p>
+                        <div className="flex items-center mt-1">
+                          <span className="text-xs text-gray-500 mr-2">Contraseña:</span>
+                          <span className="text-xs font-mono bg-gray-100 px-2 py-1 rounded border mr-2">
+                            {showPasswords[admin.id] ? admin.password : '••••••••'}
+                          </span>
+                          <button
+                            onClick={() => toggleShowPassword(admin.id)}
+                            className="text-gray-400 hover:text-gray-600"
+                          >
+                            {showPasswords[admin.id] ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => editarAdmin(index)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded text-sm hover:bg-blue-700 flex items-center"
+                      >
+                        <Edit size={14} className="mr-1" />
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => cambiarEstadoAdmin(index, admin.estado === 'activo' ? 'inactivo' : 'activo')}
+                        className={`px-3 py-1 rounded text-sm flex items-center ${
+                          admin.estado === 'activo'
+                            ? 'bg-orange-600 text-white hover:bg-orange-700'
+                            : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
+                      >
+                        {admin.estado === 'activo' ? (
+                          <>
+                            <ShieldOff size={14} className="mr-1" />
+                            Desactivar
+                          </>
+                        ) : (
+                          <>
+                            <Shield size={14} className="mr-1" />
+                            Activar
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => eliminarAdmin(index)}
+                        className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700 flex items-center"
+                      >
+                        <Trash2 size={14} className="mr-1" />
+                        Eliminar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Modal Formulario Institución */}
         {showForm && (
@@ -1043,6 +1283,97 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
                   >
                     <Download className="mr-2" size={16} />
                     Generar Excel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Formulario Administrador */}
+        {showAdminForm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg max-w-md w-full">
+              <div className="p-6">
+                <h2 className="text-xl font-bold mb-6 flex items-center">
+                  <Users className="mr-2" size={24} />
+                  {editingAdminIndex !== null ? 'Editar Administrador' : 'Nuevo Administrador'}
+                </h2>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Nombre Completo *</label>
+                    <input
+                      type="text"
+                      value={newAdmin.nombre}
+                      onChange={(e) => setNewAdmin({...newAdmin, nombre: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="Juan Pérez"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Email *</label>
+                    <input
+                      type="email"
+                      value={newAdmin.email}
+                      onChange={(e) => setNewAdmin({...newAdmin, email: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="admin@empresa.com"
+                      disabled={newAdmin.email === 'matiasmart7@gmail.com'}
+                    />
+                    {newAdmin.email === 'matiasmart7@gmail.com' && (
+                      <p className="text-xs text-red-600 mt-1">Este es el administrador principal y no puede ser modificado</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Contraseña *</label>
+                    <input
+                      type="text"
+                      value={newAdmin.password}
+                      onChange={(e) => setNewAdmin({...newAdmin, password: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                      placeholder="Contraseña segura"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Estado</label>
+                    <select
+                      value={newAdmin.estado}
+                      onChange={(e) => setNewAdmin({...newAdmin, estado: e.target.value})}
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="activo">Activo</option>
+                      <option value="inactivo">Inactivo</option>
+                    </select>
+                  </div>
+
+                  <div className="bg-purple-50 p-4 rounded-lg">
+                    <h3 className="font-medium text-purple-800 mb-2">🔑 Permisos de Administrador:</h3>
+                    <ul className="text-sm text-purple-700 space-y-1">
+                      <li>• Gestionar todas las instituciones</li>
+                      <li>• Crear y gestionar usuarios</li>
+                      <li>• Exportar reportes de cartera</li>
+                      <li>• Acceso completo al sistema</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="flex space-x-4 mt-6">
+                  <button
+                    onClick={() => setShowAdminForm(false)}
+                    className="flex-1 bg-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-400"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={agregarAdmin}
+                    className="flex-1 bg-purple-600 text-white py-3 rounded-lg hover:bg-purple-700"
+                    disabled={!newAdmin.nombre || !newAdmin.email || !newAdmin.password}
+                  >
+                    {editingAdminIndex !== null ? 'Actualizar' : 'Crear'} Administrador
                   </button>
                 </div>
               </div>

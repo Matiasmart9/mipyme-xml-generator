@@ -48,8 +48,8 @@ const App = () => {
     return <Login onLogin={handleLogin} />;
   }
 
-  // Si es admin, mostrar panel de administración
-  if (currentUser.role === 'admin') {
+  // Si es admin (principal o normal), mostrar panel de administración
+  if (currentUser.role === 'admin' || currentUser.role === 'admin-principal') {
     return (
       <AdminInstituciones 
         currentUser={currentUser} 

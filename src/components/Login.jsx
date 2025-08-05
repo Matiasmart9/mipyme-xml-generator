@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User, Lock, Eye, EyeOff, Building2 } from 'lucide-react';
-import { autenticarUsuario } from '../firebase/services';
+import { autenticarUsuarioConAdmins } from '../firebase/services';
 
 const Login = ({ onLogin }) => {
   const [formData, setFormData] = useState({
@@ -17,24 +17,13 @@ const Login = ({ onLogin }) => {
     setError('');
 
     try {
-      // Verificar credenciales de admin
-      if (formData.email === 'matiasmart7@gmail.com' && formData.password === 'admin123') {
-        onLogin({
-          id: 'admin',
-          email: 'matiasmart7@gmail.com',
-          nombre: 'Administrador',
-          role: 'admin',
-          institucionId: null
-        });
+      // Autenticar con la nueva función que incluye todos los tipos de usuarios
+      const resultado = await autenticarUsuarioConAdmins(formData.email, formData.password);
+      
+      if (resultado.success) {
+        onLogin(resultado.user);
       } else {
-        // Autenticar usuario con Firebase
-        const resultado = await autenticarUsuario(formData.email, formData.password);
-        
-        if (resultado.success) {
-          onLogin(resultado.user);
-        } else {
-          setError(resultado.error);
-        }
+        setError(resultado.error);
       }
     } catch (error) {
       setError('Error de conexión. Intente nuevamente.');
