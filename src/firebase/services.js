@@ -253,12 +253,14 @@ export const obtenerContrasenaAdminPrincipal = async () => {
     if (docSnap.exists()) {
       return { success: true, password: docSnap.data().password };
     } else {
+      // Auto-crear admin principal si no existe
       await setDoc(docRef, {
         email: 'matiasmart7@gmail.com',
         password: 'admin123',
         createdAt: new Date().toISOString(),
         lastUpdated: new Date().toISOString()
       });
+      console.log('✅ Admin principal creado automáticamente');
       return { success: true, password: 'admin123' };
     }
   } catch (error) {
