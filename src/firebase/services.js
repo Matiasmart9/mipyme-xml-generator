@@ -130,17 +130,237 @@ export const eliminarUsuario = async (institucionId, usuarioId) => {
 
 export const guardarCliente = async (institucionId, clienteData) => {
   try {
+    // ✅ CRÍTICO: Asegurar que se preserven las operaciones con su historial completo
+    const clienteCompleto = {
+      // Datos básicos del cliente
+      nombreCompleto: clienteData.nombreCompleto,
+      razonSocial: clienteData.razonSocial,
+      genero: clienteData.genero,
+      idNacionalidad: clienteData.idNacionalidad,
+      idEstadoCivil: clienteData.idEstadoCivil,
+      fechaNacimiento: clienteData.fechaNacimiento,
+      idTipoPersona: clienteData.idTipoPersona,
+      idSectorEconomico: clienteData.idSectorEconomico,
+      idTipoDoc: clienteData.idTipoDoc,
+      idPaisDoc: clienteData.idPaisDoc,
+      nroDoc: clienteData.nroDoc,
+      fechaVencimientoDoc: clienteData.fechaVencimientoDoc,
+      direccion: clienteData.direccion,
+      ciudad: clienteData.ciudad,
+      barrio: clienteData.barrio,
+      departamento: clienteData.departamento,
+      telefono: clienteData.telefono,
+      cargoTrabajo: clienteData.cargoTrabajo,
+      salario: clienteData.salario,
+      lugarTrabajo: clienteData.lugarTrabajo,
+      contactos: clienteData.contactos || [],
+      fechaRegistradaDireccion: clienteData.fechaRegistradaDireccion || '',
+      fechaInformadoTrabajo: clienteData.fechaInformadoTrabajo || '',
+      
+      // ✅ CRÍTICO: Preservar operaciones activas con historial completo
+      operacionesActivas: clienteData.operacionesActivas ? clienteData.operacionesActivas.map(operacion => ({
+        id: operacion.id,
+        idTipoOperacion: operacion.idTipoOperacion,
+        fechaOperacion: operacion.fechaOperacion,
+        numeroOperacion: operacion.numeroOperacion,
+        capitalOriginal: operacion.capitalOriginal,
+        interesOriginal: operacion.interesOriginal,
+        plazoTotalEnPeriodos: operacion.plazoTotalEnPeriodos,
+        idPeriodoPrestamo: operacion.idPeriodoPrestamo,
+        fechaVencimiento: operacion.fechaVencimiento,
+        idMoneda: operacion.idMoneda,
+        idTipoTitular: operacion.idTipoTitular,
+        capitalAdeudadoActual: operacion.capitalAdeudadoActual,
+        interesPendienteDeDevengar: operacion.interesPendienteDeDevengar,
+        capitalAtrasado: operacion.capitalAtrasado,
+        interesAtrasado: operacion.interesAtrasado,
+        moraPendienteDePago: operacion.moraPendienteDePago,
+        moraPaga: operacion.moraPaga,
+        plazoRemanenteEnPeriodos: operacion.plazoRemanenteEnPeriodos,
+        diasAtraso: operacion.diasAtraso,
+        diasAtrasoMaximo: operacion.diasAtrasoMaximo,
+        diasAtrasoPromedio: operacion.diasAtrasoPromedio,
+        // ✅ Preservar cuotas con historial completo
+        cuotas: operacion.cuotas ? operacion.cuotas.map(cuota => ({
+          numero: cuota.numero,
+          fechaVencimiento: cuota.fechaVencimiento,
+          montoCuota: cuota.montoCuota,
+          saldo: cuota.saldo,
+          estado: cuota.estado,
+          fechaPago: cuota.fechaPago || '',
+          diasAtraso: cuota.diasAtraso || 0,
+          pagos: cuota.pagos || []
+        })) : []
+      })) : [],
+      
+      // ✅ CRÍTICO: Preservar operaciones canceladas con historial completo
+      operacionesCanceladas: clienteData.operacionesCanceladas ? clienteData.operacionesCanceladas.map(operacion => ({
+        id: operacion.id,
+        idTipoOperacion: operacion.idTipoOperacion,
+        fechaOperacion: operacion.fechaOperacion,
+        numeroOperacion: operacion.numeroOperacion,
+        capitalOriginal: operacion.capitalOriginal,
+        interesOriginal: operacion.interesOriginal,
+        plazoTotalEnPeriodos: operacion.plazoTotalEnPeriodos,
+        idPeriodoPrestamo: operacion.idPeriodoPrestamo,
+        fechaVencimiento: operacion.fechaVencimiento,
+        idMoneda: operacion.idMoneda,
+        idTipoCancelacion: operacion.idTipoCancelacion,
+        fechaCancelacion: operacion.fechaCancelacion,
+        diasAtrasoMaximo: operacion.diasAtrasoMaximo || 0,
+        diasAtrasoPromedio: operacion.diasAtrasoPromedio || 0,
+        montoQuitaMora: operacion.montoQuitaMora || '0.00',
+        montoQuitaInteres: operacion.montoQuitaInteres || '0.00',
+        montoQuitaCapital: operacion.montoQuitaCapital || '0.00',
+        montoInteresGenerado: operacion.montoInteresGenerado || '0.00',
+        // ✅ Preservar cuotas canceladas con historial completo
+        cuotas: operacion.cuotas ? operacion.cuotas.map(cuota => ({
+          numero: cuota.numero,
+          fechaVencimiento: cuota.fechaVencimiento,
+          montoCuota: cuota.montoCuota,
+          saldo: cuota.saldo || 0,
+          estado: cuota.estado || 'pagado',
+          fechaPago: cuota.fechaPago || '', // ✅ PRESERVAR fecha de pago real
+          diasAtraso: cuota.diasAtraso || 0, // ✅ PRESERVAR días de atraso reales
+          pagos: cuota.pagos || [] // ✅ PRESERVAR historial de pagos parciales
+        })) : []
+      })) : [],
+      
+      // Metadatos
+      fechaCreacion: new Date().toISOString(),
+      fechaModificacion: new Date().toISOString()
+    };
+
+    console.log('🔍 FIREBASE - Guardando cliente completo:', clienteCompleto);
+    console.log('🔍 FIREBASE - Operaciones activas:', clienteCompleto.operacionesActivas);
+    console.log('🔍 FIREBASE - Operaciones canceladas:', clienteCompleto.operacionesCanceladas);
+
     const docRef = await addDoc(
       collection(db, "instituciones", institucionId, "clientes"), 
-      {
-        ...clienteData,
-        fechaCreacion: new Date().toISOString(),
-        fechaModificacion: new Date().toISOString()
-      }
+      clienteCompleto
     );
+    
+    console.log('✅ FIREBASE - Cliente guardado con ID:', docRef.id);
     return { success: true, id: docRef.id };
   } catch (error) {
     console.error("Error guardando cliente:", error);
+    return { success: false, error: error.message };
+  }
+};
+
+export const actualizarCliente = async (institucionId, clienteId, datos) => {
+  try {
+    // ✅ CRÍTICO: Asegurar que se preserven las operaciones con su historial completo
+    const datosCompletos = {
+      // Datos básicos del cliente
+      nombreCompleto: datos.nombreCompleto,
+      razonSocial: datos.razonSocial,
+      genero: datos.genero,
+      idNacionalidad: datos.idNacionalidad,
+      idEstadoCivil: datos.idEstadoCivil,
+      fechaNacimiento: datos.fechaNacimiento,
+      idTipoPersona: datos.idTipoPersona,
+      idSectorEconomico: datos.idSectorEconomico,
+      idTipoDoc: datos.idTipoDoc,
+      idPaisDoc: datos.idPaisDoc,
+      nroDoc: datos.nroDoc,
+      fechaVencimientoDoc: datos.fechaVencimientoDoc,
+      direccion: datos.direccion,
+      ciudad: datos.ciudad,
+      barrio: datos.barrio,
+      departamento: datos.departamento,
+      telefono: datos.telefono,
+      cargoTrabajo: datos.cargoTrabajo,
+      salario: datos.salario,
+      lugarTrabajo: datos.lugarTrabajo,
+      contactos: datos.contactos || [],
+      fechaRegistradaDireccion: datos.fechaRegistradaDireccion || '',
+      fechaInformadoTrabajo: datos.fechaInformadoTrabajo || '',
+      
+      // ✅ CRÍTICO: Preservar operaciones activas con historial completo
+      operacionesActivas: datos.operacionesActivas ? datos.operacionesActivas.map(operacion => ({
+        id: operacion.id,
+        idTipoOperacion: operacion.idTipoOperacion,
+        fechaOperacion: operacion.fechaOperacion,
+        numeroOperacion: operacion.numeroOperacion,
+        capitalOriginal: operacion.capitalOriginal,
+        interesOriginal: operacion.interesOriginal,
+        plazoTotalEnPeriodos: operacion.plazoTotalEnPeriodos,
+        idPeriodoPrestamo: operacion.idPeriodoPrestamo,
+        fechaVencimiento: operacion.fechaVencimiento,
+        idMoneda: operacion.idMoneda,
+        idTipoTitular: operacion.idTipoTitular,
+        capitalAdeudadoActual: operacion.capitalAdeudadoActual,
+        interesPendienteDeDevengar: operacion.interesPendienteDeDevengar,
+        capitalAtrasado: operacion.capitalAtrasado,
+        interesAtrasado: operacion.interesAtrasado,
+        moraPendienteDePago: operacion.moraPendienteDePago,
+        moraPaga: operacion.moraPaga,
+        plazoRemanenteEnPeriodos: operacion.plazoRemanenteEnPeriodos,
+        diasAtraso: operacion.diasAtraso,
+        diasAtrasoMaximo: operacion.diasAtrasoMaximo,
+        diasAtrasoPromedio: operacion.diasAtrasoPromedio,
+        // ✅ Preservar cuotas con historial completo
+        cuotas: operacion.cuotas ? operacion.cuotas.map(cuota => ({
+          numero: cuota.numero,
+          fechaVencimiento: cuota.fechaVencimiento,
+          montoCuota: cuota.montoCuota,
+          saldo: cuota.saldo,
+          estado: cuota.estado,
+          fechaPago: cuota.fechaPago || '',
+          diasAtraso: cuota.diasAtraso || 0,
+          pagos: cuota.pagos || []
+        })) : []
+      })) : [],
+      
+      // ✅ CRÍTICO: Preservar operaciones canceladas con historial completo
+      operacionesCanceladas: datos.operacionesCanceladas ? datos.operacionesCanceladas.map(operacion => ({
+        id: operacion.id,
+        idTipoOperacion: operacion.idTipoOperacion,
+        fechaOperacion: operacion.fechaOperacion,
+        numeroOperacion: operacion.numeroOperacion,
+        capitalOriginal: operacion.capitalOriginal,
+        interesOriginal: operacion.interesOriginal,
+        plazoTotalEnPeriodos: operacion.plazoTotalEnPeriodos,
+        idPeriodoPrestamo: operacion.idPeriodoPrestamo,
+        fechaVencimiento: operacion.fechaVencimiento,
+        idMoneda: operacion.idMoneda,
+        idTipoCancelacion: operacion.idTipoCancelacion,
+        fechaCancelacion: operacion.fechaCancelacion,
+        diasAtrasoMaximo: operacion.diasAtrasoMaximo || 0,
+        diasAtrasoPromedio: operacion.diasAtrasoPromedio || 0,
+        montoQuitaMora: operacion.montoQuitaMora || '0.00',
+        montoQuitaInteres: operacion.montoQuitaInteres || '0.00',
+        montoQuitaCapital: operacion.montoQuitaCapital || '0.00',
+        montoInteresGenerado: operacion.montoInteresGenerado || '0.00',
+        // ✅ Preservar cuotas canceladas con historial completo
+        cuotas: operacion.cuotas ? operacion.cuotas.map(cuota => ({
+          numero: cuota.numero,
+          fechaVencimiento: cuota.fechaVencimiento,
+          montoCuota: cuota.montoCuota,
+          saldo: cuota.saldo || 0,
+          estado: cuota.estado || 'pagado',
+          fechaPago: cuota.fechaPago || '', // ✅ PRESERVAR fecha de pago real
+          diasAtraso: cuota.diasAtraso || 0, // ✅ PRESERVAR días de atraso reales
+          pagos: cuota.pagos || [] // ✅ PRESERVAR historial de pagos parciales
+        })) : []
+      })) : [],
+      
+      // Metadatos
+      fechaModificacion: new Date().toISOString()
+    };
+
+    console.log('🔍 FIREBASE - Actualizando cliente:', clienteId);
+    console.log('🔍 FIREBASE - Datos completos:', datosCompletos);
+    console.log('🔍 FIREBASE - Operaciones canceladas:', datosCompletos.operacionesCanceladas);
+
+    const docRef = doc(db, "instituciones", institucionId, "clientes", clienteId);
+    await updateDoc(docRef, datosCompletos);
+    
+    console.log('✅ FIREBASE - Cliente actualizado exitosamente');
+    return { success: true };
+  } catch (error) {
+    console.error("Error actualizando cliente:", error);
     return { success: false, error: error.message };
   }
 };
@@ -160,20 +380,6 @@ export const obtenerClientes = async (institucionId) => {
     return { success: true, data: clientes };
   } catch (error) {
     console.error("Error obteniendo clientes:", error);
-    return { success: false, error: error.message };
-  }
-};
-
-export const actualizarCliente = async (institucionId, clienteId, datos) => {
-  try {
-    const docRef = doc(db, "instituciones", institucionId, "clientes", clienteId);
-    await updateDoc(docRef, {
-      ...datos,
-      fechaModificacion: new Date().toISOString()
-    });
-    return { success: true };
-  } catch (error) {
-    console.error("Error actualizando cliente:", error);
     return { success: false, error: error.message };
   }
 };

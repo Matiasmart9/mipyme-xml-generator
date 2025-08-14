@@ -40,7 +40,9 @@ const Dashboard = ({ currentUser, onLogout }) => {
     lugarTrabajo: '',
     contactos: [],
     operacionesActivas: [],
-    operacionesCanceladas: []
+    operacionesCanceladas: [],
+    fechaRegistradaDireccion: '',
+    fechaInformadoTrabajo: ''
   });
 
   const [newContact, setNewContact] = useState({
@@ -102,6 +104,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
 
   const nacionalidades = [
     { id: 'PY', label: 'Paraguaya' },
+    { id: 'AR', label: 'Argentina' },
     { id: 'BR', label: 'Brasil' }
   ];
 
@@ -125,24 +128,24 @@ const Dashboard = ({ currentUser, onLogout }) => {
   ];
 
   const departamentos = [
-    { id: '0', label: 'Sin especificar' },
-    { id: '1', label: 'Alto Paraguay' },
-    { id: '2', label: 'Alto Paraná' },
-    { id: '3', label: 'Amambay' },
-    { id: '4', label: 'Boquerón' },
+    { id: '0', label: 'Asunción' },
+    { id: '17', label: 'Alto Paraguay' },
+    { id: '10', label: 'Alto Paraná' },
+    { id: '13', label: 'Amambay' },
+    { id: '16', label: 'Boquerón' },
     { id: '5', label: 'Caaguazú' },
     { id: '6', label: 'Caazapá' },
-    { id: '7', label: 'Canindeyú' },
-    { id: '8', label: 'Central' },
-    { id: '9', label: 'Concepción' },
-    { id: '10', label: 'Guairá' },
-    { id: '11', label: 'Itapúa' },
-    { id: '12', label: 'Cordillera' },
-    { id: '13', label: 'Misiones' },
-    { id: '14', label: 'Ñeembucú' },
-    { id: '15', label: 'Paraguarí' },
-    { id: '16', label: 'Presidente Hayes' },
-    { id: '17', label: 'San Pedro' }
+    { id: '14', label: 'Canindeyú' },
+    { id: '11', label: 'Central' },
+    { id: '1', label: 'Concepción' },
+    { id: '4', label: 'Guairá' },
+    { id: '7', label: 'Itapúa' },
+    { id: '3', label: 'Cordillera' },
+    { id: '8', label: 'Misiones' },
+    { id: '12', label: 'Ñeembucú' },
+    { id: '9', label: 'Paraguarí' },
+    { id: '15', label: 'Presidente Hayes' },
+    { id: '2', label: 'San Pedro' }
   ];
 
   const validarRUC = (ruc) => {
@@ -187,14 +190,16 @@ const Dashboard = ({ currentUser, onLogout }) => {
       direccion: '',
       ciudad: '',
       barrio: '',
-      departamento: '8', // Central por defecto
+      departamento: '0', // Asunción por defecto
       telefono: '',
       cargoTrabajo: '',
       salario: '',
       lugarTrabajo: '',
       contactos: [],
       operacionesActivas: [],
-      operacionesCanceladas: []
+      operacionesCanceladas: [],
+      fechaRegistradaDireccion: '',
+      fechaInformadoTrabajo: ''
     });
     setIsEditMode(false);
     setEditingPersonId(null);
@@ -243,6 +248,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
   }, [currentPerson.nombreCompleto, currentPerson.idTipoPersona]);
 
   const guardarPersona = async () => {
+    // ===== VALIDACIONES BÁSICAS =====
     if (!currentPerson.nombreCompleto || !currentPerson.nroDoc) {
       alert('Nombre completo y documento son requeridos');
       return;
@@ -253,34 +259,245 @@ const Dashboard = ({ currentUser, onLogout }) => {
       return;
     }
 
-    try {
-      if (isEditMode) {
-        // Actualizar cliente existente
-        const resultado = await actualizarCliente(currentUser.institucionId, editingPersonId, currentPerson);
-        
-        if (resultado.success) {
-          alert('Cliente actualizado exitosamente');
-          await cargarClientes(); // Recargar datos
-        } else {
-          alert('Error actualizando cliente: ' + resultado.error);
-        }
-      } else {
-        // Crear nuevo cliente
-        const resultado = await guardarCliente(currentUser.institucionId, currentPerson);
-        
-        if (resultado.success) {
-          alert('Cliente guardado exitosamente');
-          cargarClientes(); // Recargar datos
-        } else {
-          alert('Error guardando cliente: ' + resultado.error);
-        }
+    // ===== VALIDACIONES PARA PERSONAS FÍSICAS =====
+    if (currentPerson.idTipoPersona === '1') {
+      // Campos obligatorios para personas físicas
+      if (!currentPerson.genero) {
+        alert('El género es obligatorio para personas físicas');
+        return;
+      }
+      
+      if (!currentPerson.fechaNacimiento) {
+        alert('La fecha de nacimiento es obligatoria para personas físicas');
+        return;
+      }
+      
+      if (!currentPerson.idEstadoCivil) {
+        alert('El estado civil es obligatorio para personas físicas');
+        return;
+      }
+    }
 
-        if (resultado.success) {
-          alert('Cliente guardado exitosamente');
-          await cargarClientes(); // Recargar datos
-        } else {
-          alert('Error guardando cliente: ' + resultado.error);
-        }
+    // ===== VALIDACIONES PARA TODOS =====
+    if (!currentPerson.idNacionalidad) {
+      alert('La nacionalidad es obligatoria');
+      return;
+    }
+
+    if (!currentPerson.idSectorEconomico) {
+      alert('El sector económico es obligatorio');
+      return;
+    }
+
+    // ===== VALIDACIONES DE DOCUMENTOS =====
+    if (!currentPerson.idPaisDoc) {
+      alert('El país del documento es obligatorio');
+      return;
+    }
+
+    if (!currentPerson.fechaVencimientoDoc) {
+      alert('La fecha de vencimiento del documento es obligatoria');
+      return;
+    }
+
+    // ===== VALIDACIONES DE CONTACTOS =====
+    if (!currentPerson.contactos || currentPerson.contactos.length === 0) {
+      alert('Debe agregar al menos un contacto (correo o número)');
+      return;
+    }
+
+    // ===== VALIDACIONES DE DIRECCIÓN Y TRABAJO =====
+    if (!currentPerson.direccion || currentPerson.direccion.trim() === '') {
+      alert('La dirección es obligatoria');
+      return;
+    }
+
+    if (!currentPerson.departamento || currentPerson.departamento === '0') {
+      alert('El departamento es obligatorio');
+      return;
+    }
+
+    if (!currentPerson.ciudad || currentPerson.ciudad.trim() === '') {
+      alert('La ciudad es obligatoria');
+      return;
+    }
+
+    if (!currentPerson.barrio || currentPerson.barrio.trim() === '') {
+      alert('El barrio es obligatorio');
+      return;
+    }
+
+    if (!currentPerson.telefono || currentPerson.telefono.trim() === '') {
+      alert('El teléfono es obligatorio');
+      return;
+    }
+
+    if (!currentPerson.cargoTrabajo || currentPerson.cargoTrabajo.trim() === '') {
+      alert('El cargo de trabajo es obligatorio');
+      return;
+    }
+
+    if (!currentPerson.salario || currentPerson.salario.trim() === '') {
+      alert('El salario es obligatorio');
+      return;
+    }
+
+    if (!currentPerson.lugarTrabajo || currentPerson.lugarTrabajo.trim() === '') {
+      alert('El lugar de trabajo es obligatorio');
+      return;
+    }
+
+    // ===== VALIDACIONES DE FECHAS OBLIGATORIAS =====
+    if (!currentPerson.fechaRegistradaDireccion) {
+      alert('La fecha de registro de dirección es obligatoria');
+      return;
+    }
+
+    if (!currentPerson.fechaInformadoTrabajo) {
+      alert('La fecha de informado de trabajo es obligatoria');
+      return;
+    }
+
+    // ===== VALIDAR DEPARTAMENTO NO SEA UNDEFINED =====
+    if (!currentPerson.departamento) {
+      setCurrentPerson(prev => ({
+        ...prev,
+        departamento: '8' // Central por defecto
+      }));
+    }
+
+    try {
+      // ✅ CRÍTICO: Crear persona completa con TODOS los datos preservados
+      const personaCompleta = {
+        // Datos básicos de la persona
+        nombreCompleto: currentPerson.nombreCompleto,
+        razonSocial: currentPerson.razonSocial,
+        genero: currentPerson.genero,
+        idNacionalidad: currentPerson.idNacionalidad,
+        idEstadoCivil: currentPerson.idEstadoCivil,
+        fechaNacimiento: currentPerson.fechaNacimiento,
+        idTipoPersona: currentPerson.idTipoPersona,
+        idSectorEconomico: currentPerson.idSectorEconomico,
+        idTipoDoc: currentPerson.idTipoDoc,
+        idPaisDoc: currentPerson.idPaisDoc,
+        nroDoc: currentPerson.nroDoc,
+        fechaVencimientoDoc: currentPerson.fechaVencimientoDoc,
+        direccion: currentPerson.direccion,
+        ciudad: currentPerson.ciudad,
+        barrio: currentPerson.barrio,
+        departamento: currentPerson.departamento,
+        telefono: currentPerson.telefono,
+        cargoTrabajo: currentPerson.cargoTrabajo,
+        salario: currentPerson.salario,
+        lugarTrabajo: currentPerson.lugarTrabajo,
+        contactos: currentPerson.contactos || [],
+        fechaRegistradaDireccion: currentPerson.fechaRegistradaDireccion || '',
+        fechaInformadoTrabajo: currentPerson.fechaInformadoTrabajo || '',
+        
+        // ✅ CRÍTICO: Preservar operaciones activas con TODO su historial
+        operacionesActivas: currentPerson.operacionesActivas ? currentPerson.operacionesActivas.map(operacion => ({
+          // Datos básicos de la operación
+          id: operacion.id,
+          idTipoOperacion: operacion.idTipoOperacion,
+          fechaOperacion: operacion.fechaOperacion,
+          numeroOperacion: operacion.numeroOperacion,
+          capitalOriginal: operacion.capitalOriginal,
+          interesOriginal: operacion.interesOriginal || '',
+          plazoTotalEnPeriodos: operacion.plazoTotalEnPeriodos,
+          idPeriodoPrestamo: operacion.idPeriodoPrestamo,
+          fechaVencimiento: operacion.fechaVencimiento,
+          idMoneda: operacion.idMoneda,
+          idTipoTitular: operacion.idTipoTitular,
+          
+          // Datos calculados
+          capitalAdeudadoActual: operacion.capitalAdeudadoActual,
+          interesPendienteDeDevengar: operacion.interesPendienteDeDevengar,
+          capitalAtrasado: operacion.capitalAtrasado,
+          interesAtrasado: operacion.interesAtrasado,
+          moraPendienteDePago: operacion.moraPendienteDePago,
+          moraPaga: operacion.moraPaga,
+          plazoRemanenteEnPeriodos: operacion.plazoRemanenteEnPeriodos,
+          diasAtraso: operacion.diasAtraso,
+          diasAtrasoMaximo: operacion.diasAtrasoMaximo,
+          diasAtrasoPromedio: operacion.diasAtrasoPromedio,
+          
+          // ✅ CRÍTICO: Preservar EXACTAMENTE las cuotas con su historial completo
+          cuotas: operacion.cuotas ? operacion.cuotas.map(cuota => ({
+            numero: cuota.numero,
+            fechaVencimiento: cuota.fechaVencimiento,
+            montoCuota: cuota.montoCuota,
+            saldo: cuota.saldo,
+            estado: cuota.estado,
+            fechaPago: cuota.fechaPago || '', // ✅ PRESERVAR fecha de pago
+            diasAtraso: cuota.diasAtraso || 0, // ✅ PRESERVAR días de atraso
+            pagos: cuota.pagos ? cuota.pagos.map(pago => ({
+              fecha: pago.fecha,
+              monto: pago.monto,
+              diasAtraso: pago.diasAtraso,
+              tipo: pago.tipo
+            })) : [] // ✅ PRESERVAR historial de pagos parciales
+          })) : []
+        })) : [],
+        
+        // ✅ CRÍTICO: Preservar operaciones canceladas con TODO su historial
+        operacionesCanceladas: currentPerson.operacionesCanceladas ? currentPerson.operacionesCanceladas.map(operacion => ({
+          // Datos básicos de la operación
+          id: operacion.id,
+          idTipoOperacion: operacion.idTipoOperacion,
+          fechaOperacion: operacion.fechaOperacion,
+          numeroOperacion: operacion.numeroOperacion,
+          capitalOriginal: operacion.capitalOriginal,
+          interesOriginal: operacion.interesOriginal || '',
+          plazoTotalEnPeriodos: operacion.plazoTotalEnPeriodos,
+          idPeriodoPrestamo: operacion.idPeriodoPrestamo,
+          fechaVencimiento: operacion.fechaVencimiento,
+          idMoneda: operacion.idMoneda,
+          
+          // Datos específicos de cancelación
+          idTipoCancelacion: operacion.idTipoCancelacion,
+          fechaCancelacion: operacion.fechaCancelacion,
+          diasAtrasoMaximo: operacion.diasAtrasoMaximo || 0,
+          diasAtrasoPromedio: operacion.diasAtrasoPromedio || 0,
+          montoQuitaMora: operacion.montoQuitaMora || '0.00',
+          montoQuitaInteres: operacion.montoQuitaInteres || '0.00',
+          montoQuitaCapital: operacion.montoQuitaCapital || '0.00',
+          montoInteresGenerado: operacion.montoInteresGenerado || '0.00',
+          
+          // ✅ CRÍTICO: Preservar EXACTAMENTE las cuotas con su historial completo
+          cuotas: operacion.cuotas ? operacion.cuotas.map(cuota => ({
+            numero: cuota.numero,
+            fechaVencimiento: cuota.fechaVencimiento,
+            montoCuota: cuota.montoCuota,
+            saldo: 0, // En canceladas todo está pagado
+            estado: 'pagado',
+            fechaPago: cuota.fechaPago || '', // ✅ PRESERVAR fecha de pago REAL
+            diasAtraso: cuota.diasAtraso || 0, // ✅ PRESERVAR días de atraso REALES
+            pagos: cuota.pagos ? cuota.pagos.map(pago => ({
+              fecha: pago.fecha,
+              monto: pago.monto,
+              diasAtraso: pago.diasAtraso,
+              tipo: pago.tipo
+            })) : [] // ✅ PRESERVAR historial de pagos parciales
+          })) : []
+        })) : []
+      };
+
+      console.log('🔍 GUARDANDO PERSONA COMPLETA:', personaCompleta);
+      console.log('🔍 OPERACIONES ACTIVAS A GUARDAR:', personaCompleta.operacionesActivas);
+      console.log('🔍 OPERACIONES CANCELADAS A GUARDAR:', personaCompleta.operacionesCanceladas);
+
+      let resultado;
+      if (isEditMode) {
+        resultado = await actualizarCliente(currentUser.institucionId, editingPersonId, personaCompleta);
+      } else {
+        resultado = await guardarCliente(currentUser.institucionId, personaCompleta);
+      }
+      
+      if (resultado.success) {
+        alert(isEditMode ? 'Cliente actualizado exitosamente' : 'Cliente guardado exitosamente');
+        await cargarClientes(); // Recargar datos
+      } else {
+        alert('Error guardando cliente: ' + resultado.error);
       }
 
       // Reset form
@@ -300,21 +517,23 @@ const Dashboard = ({ currentUser, onLogout }) => {
         direccion: '',
         ciudad: '',
         barrio: '',
-        departamento: '8', // Central por defecto
+        departamento: '0',
         telefono: '',
         cargoTrabajo: '',
         salario: '',
         lugarTrabajo: '',
         contactos: [],
         operacionesActivas: [],
-        operacionesCanceladas: []
+        operacionesCanceladas: [],
+        fechaRegistradaDireccion: '',
+        fechaInformadoTrabajo: ''
       });
       setShowPersonForm(false);
       setIsEditMode(false);
       setEditingPersonId(null);
     } catch (error) {
       alert('Error de conexión: ' + error.message);
-    }
+    } 
   };
 
   // Cargar clientes desde Firebase al montar el componente
@@ -524,12 +743,17 @@ const Dashboard = ({ currentUser, onLogout }) => {
         xml += `    <Direcciones Direccion_Libre="${persona.direccion} Ciudad: ${persona.ciudad} Barrio: ${persona.barrio}" `;
         xml += `Calle="${persona.direccion}" IdPais="PY" IdDepartamento="${persona.departamento || '0'}" `;
         xml += `Ciudad="${persona.ciudad}" Barrio="${persona.barrio}" `;
-        xml += `Telefono="${persona.telefono}" FechaRegistrada="${fechaInforme}" IdTipoDireccion="1" />\n`;
+        xml += `Telefono="${persona.telefono}" `;
+        // ✅ USAR LA FECHA REAL DE REGISTRO EN LUGAR DE fechaInforme
+        xml += `FechaRegistrada="${persona.fechaRegistradaDireccion || fechaInforme}" `;
+        xml += `IdTipoDireccion="1" />\n`;
       }
 
       if (persona.cargoTrabajo) {
         xml += `    <Trabajos EsDependiente="1" CargoTrabajo="${persona.cargoTrabajo}" `;
-        xml += `Salario="${persona.salario}" FechaInformado="${fechaInforme}" `;
+        xml += `Salario="${persona.salario}" `;
+        // ✅ USAR LA FECHA PERSISTENTE O FECHA ACTUAL COMO FALLBACK
+        xml += `FechaInformado="${persona.fechaInformadoTrabajo || fechaInforme}" `;
         xml += `ComprobanteIngreso="1" LugarDeTrabajo="${persona.lugarTrabajo}" />\n`;
       }
 
@@ -816,7 +1040,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                   {currentPerson.idTipoPersona === '1' && (
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-sm font-medium mb-1">Género</label>
+                        <label className="block text-sm font-medium mb-1">Género *</label>
                         <select
                           value={currentPerson.genero}
                           onChange={(e) => setCurrentPerson({...currentPerson, genero: e.target.value})}
@@ -827,7 +1051,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-1">Fecha Nacimiento</label>
+                        <label className="block text-sm font-medium mb-1">Fecha Nacimiento *</label>
                         <input
                           type="date"
                           value={currentPerson.fechaNacimiento}
@@ -841,7 +1065,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                   <div className="grid grid-cols-2 gap-3">
                     {currentPerson.idTipoPersona === '1' && (
                       <div>
-                        <label className="block text-sm font-medium mb-1">Estado Civil</label>
+                        <label className="block text-sm font-medium mb-1">Estado Civil *</label>
                         <select
                           value={currentPerson.idEstadoCivil}
                           onChange={(e) => setCurrentPerson({...currentPerson, idEstadoCivil: e.target.value})}
@@ -854,7 +1078,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                       </div>
                     )}
                     <div className={currentPerson.idTipoPersona === '1' ? '' : 'col-span-2'}>
-                      <label className="block text-sm font-medium mb-1">Nacionalidad</label>
+                      <label className="block text-sm font-medium mb-1">Nacionalidad *</label>
                       <select
                         value={currentPerson.idNacionalidad}
                         onChange={(e) => setCurrentPerson({...currentPerson, idNacionalidad: e.target.value})}
@@ -868,7 +1092,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">Sector Económico</label>
+                    <label className="block text-sm font-medium mb-1">Sector Económico *</label>
                     <select
                       value={currentPerson.idSectorEconomico}
                       onChange={(e) => setCurrentPerson({...currentPerson, idSectorEconomico: e.target.value})}
@@ -904,7 +1128,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-1">País Documento</label>
+                        <label className="block text-sm font-medium mb-1">País Documento *</label>
                         <select
                           value={currentPerson.idPaisDoc}
                           onChange={(e) => setCurrentPerson({...currentPerson, idPaisDoc: e.target.value})}
@@ -929,7 +1153,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium mb-1">País Documento</label>
+                        <label className="block text-sm font-medium mb-1">País Documento *</label>
                         <select
                           value={currentPerson.idPaisDoc}
                           onChange={(e) => setCurrentPerson({...currentPerson, idPaisDoc: e.target.value})}
@@ -965,7 +1189,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">Fecha Vencimiento</label>
+                    <label className="block text-sm font-medium mb-1">Fecha Vencimiento *</label>
                     <input
                       type="date"
                       value={currentPerson.fechaVencimientoDoc}
@@ -979,7 +1203,8 @@ const Dashboard = ({ currentUser, onLogout }) => {
               {/* Contactos */}
               <div className="border rounded-lg p-4">
                 <h3 className="font-semibold text-purple-600 mb-3 border-b pb-2">
-                  Contactos del Cliente
+                  Contactos del Cliente *
+                  <span className="text-xs font-normal text-gray-600 ml-2">(Al menos uno requerido)</span>
                 </h3>
                 
                 {/* Lista de contactos */}
@@ -1044,19 +1269,19 @@ const Dashboard = ({ currentUser, onLogout }) => {
                 
                 <div className="space-y-3">
                   <div>
-                    <label className="block text-sm font-medium mb-1">Dirección</label>
+                    <label className="block text-sm font-medium mb-1">Dirección *</label>
                     <input
                       type="text"
                       value={currentPerson.direccion}
                       onChange={(e) => setCurrentPerson({...currentPerson, direccion: e.target.value})}
                       className="w-full p-2 border rounded"
-                      placeholder="Calle y número"
+                      placeholder="Calle del cliente"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 gap-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Departamento</label>
+                      <label className="block text-sm font-medium mb-1">Departamento *</label>
                       <select
                         value={currentPerson.departamento}
                         onChange={(e) => setCurrentPerson({...currentPerson, departamento: e.target.value})}
@@ -1071,7 +1296,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Ciudad</label>
+                      <label className="block text-sm font-medium mb-1">Ciudad *</label>
                       <input
                         type="text"
                         value={currentPerson.ciudad}
@@ -1080,7 +1305,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Barrio</label>
+                      <label className="block text-sm font-medium mb-1">Barrio *</label>
                       <input
                         type="text"
                         value={currentPerson.barrio}
@@ -1090,19 +1315,34 @@ const Dashboard = ({ currentUser, onLogout }) => {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
-                    <label className="block text-sm font-medium mb-1">Teléfono</label>
-                    <input
-                      type="text"
-                      value={currentPerson.telefono}
-                      onChange={(e) => setCurrentPerson({...currentPerson, telefono: e.target.value})}
-                      className="w-full p-2 border rounded"
-                      placeholder="0981-123456"
-                    />
+                      <label className="block text-sm font-medium mb-1">Teléfono *</label>
+                      <input
+                        type="text"
+                        value={currentPerson.telefono}
+                        onChange={(e) => setCurrentPerson({...currentPerson, telefono: e.target.value})}
+                        className="w-full p-2 border rounded"
+                        placeholder="0981-123456"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Fecha Registro Dirección *
+                        <span className="text-xs text-gray-500 ml-1">(para XML)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={currentPerson.fechaRegistradaDireccion}
+                        onChange={(e) => setCurrentPerson({...currentPerson, fechaRegistradaDireccion: e.target.value})}
+                        className="w-full p-2 border rounded"
+                        required
+                      />
+                    </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium mb-1">Cargo de Trabajo</label>
+                    <label className="block text-sm font-medium mb-1">Cargo de Trabajo *</label>
                     <input
                       type="text"
                       value={currentPerson.cargoTrabajo}
@@ -1112,19 +1352,19 @@ const Dashboard = ({ currentUser, onLogout }) => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-sm font-medium mb-1">Salario (Gs.)</label>
+                      <label className="block text-sm font-medium mb-1">Salario (Gs.) *</label>
                       <input
                         type="number"
                         value={currentPerson.salario}
                         onChange={(e) => setCurrentPerson({...currentPerson, salario: e.target.value})}
                         className="w-full p-2 border rounded"
-                        placeholder="2500000"
+                        placeholder="2750000"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium mb-1">Lugar de Trabajo</label>
+                      <label className="block text-sm font-medium mb-1">Lugar de Trabajo *</label>
                       <input
                         type="text"
                         value={currentPerson.lugarTrabajo}
@@ -1132,6 +1372,66 @@ const Dashboard = ({ currentUser, onLogout }) => {
                         className="w-full p-2 border rounded"
                       />
                     </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">
+                        Fecha Informado Trabajo *
+                        <span className="text-xs text-gray-500 ml-1">(para XML)</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={currentPerson.fechaInformadoTrabajo}
+                        onChange={(e) => setCurrentPerson({...currentPerson, fechaInformadoTrabajo: e.target.value})}
+                        className="w-full p-2 border rounded"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Información sobre las fechas */}
+                  <div className="bg-blue-50 p-3 rounded">
+                    <div className="flex justify-between items-start mb-2">
+                      <h4 className="font-medium text-blue-700">📅 Información sobre las fechas:</h4>
+                      <div className="flex space-x-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const fechaHoy = new Date().toISOString().split('T')[0];
+                            if (!currentPerson.fechaRegistradaDireccion) {
+                              setCurrentPerson(prev => ({
+                                ...prev,
+                                fechaRegistradaDireccion: fechaHoy
+                              }));
+                            }
+                          }}
+                          className="text-xs bg-blue-600 text-white px-2 py-1 rounded hover:bg-blue-700"
+                          disabled={!!currentPerson.fechaRegistradaDireccion}
+                        >
+                          Fecha Dirección Hoy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const fechaHoy = new Date().toISOString().split('T')[0];
+                            if (!currentPerson.fechaInformadoTrabajo) {
+                              setCurrentPerson(prev => ({
+                                ...prev,
+                                fechaInformadoTrabajo: fechaHoy
+                              }));
+                            }
+                          }}
+                          className="text-xs bg-orange-600 text-white px-2 py-1 rounded hover:bg-orange-700"
+                          disabled={!!currentPerson.fechaInformadoTrabajo}
+                        >
+                          Fecha Trabajo Hoy
+                        </button>
+                      </div>
+                    </div>
+                    <ul className="text-xs text-blue-600 space-y-1">
+                      <li>• <strong>Fecha Registro Dirección:</strong> Se usa como "FechaRegistrada" en el XML</li>
+                      <li>• <strong>Fecha Informado Trabajo:</strong> Se usa como "FechaInformado" en el XML</li>
+                      <li>• Estas fechas son OBLIGATORIAS y se guardan permanentemente</li>
+                      <li>• Use los botones de arriba para establecer la fecha de hoy rápidamente</li>
+                    </ul>
                   </div>
                 </div>
               </div>
@@ -1145,23 +1445,76 @@ const Dashboard = ({ currentUser, onLogout }) => {
                 onMoverACancelada={(operacionIndex) => {
                   const operacionAMover = currentPerson.operacionesActivas[operacionIndex];
                   
-                  // Crear la operación cancelada con los datos correctos
+                  console.log('🔍 ANTES DE MOVER - Operación original:', operacionAMover);
+                  console.log('🔍 ANTES DE MOVER - Cuotas originales:', operacionAMover.cuotas);
+                  
+                  // ✅ CRÍTICO: Crear la operación cancelada preservando TODO el historial
                   const operacionCancelada = {
-                    ...operacionAMover,
+                    // Datos básicos de la operación (preservar TODOS)
                     id: Date.now(), // Nuevo ID para la operación cancelada
+                    idTipoOperacion: operacionAMover.idTipoOperacion,
+                    fechaOperacion: operacionAMover.fechaOperacion,
+                    numeroOperacion: operacionAMover.numeroOperacion,
+                    capitalOriginal: operacionAMover.capitalOriginal,
+                    interesOriginal: operacionAMover.interesOriginal || '',
+                    plazoTotalEnPeriodos: operacionAMover.plazoTotalEnPeriodos,
+                    idPeriodoPrestamo: operacionAMover.idPeriodoPrestamo,
+                    fechaVencimiento: operacionAMover.fechaVencimiento,
+                    idMoneda: operacionAMover.idMoneda,
+                    idTipoTitular: operacionAMover.idTipoTitular,
+                    
+                    // Datos específicos de cancelación
                     idTipoCancelacion: determinarTipoCancelacion(operacionAMover),
-                    fechaCancelacion: obtenerUltimaFechaPago(operacionAMover.cuotas),
+                    fechaCancelacion: obtenerUltimaFechaPago(operacionAMover.cuotas) || new Date().toISOString().split('T')[0],
                     diasAtrasoMaximo: operacionAMover.diasAtrasoMaximo || 0,
                     diasAtrasoPromedio: operacionAMover.diasAtrasoPromedio || 0,
                     montoQuitaMora: '0.00',
                     montoQuitaInteres: '0.00',
                     montoQuitaCapital: '0.00',
-                    montoInteresGenerado: '0.00'
+                    montoInteresGenerado: '0.00',
+                    
+                    // ✅ CRÍTICO: Preservar EXACTAMENTE las cuotas con su historial COMPLETO
+                    cuotas: operacionAMover.cuotas ? operacionAMover.cuotas.map(cuota => {
+                      console.log(`🔍 Procesando cuota ${cuota.numero}:`, cuota);
+                      
+                      return {
+                        numero: cuota.numero,
+                        fechaVencimiento: cuota.fechaVencimiento,
+                        montoCuota: cuota.montoCuota,
+                        saldo: 0, // En canceladas todo está pagado
+                        estado: 'pagado',
+                        
+                        // ✅ CRÍTICO: Preservar fecha de pago REAL (no vacía)
+                        fechaPago: cuota.fechaPago || cuota.fechaVencimiento, 
+                        
+                        // ✅ CRÍTICO: Preservar días de atraso REALES
+                        diasAtraso: cuota.diasAtraso || 0,
+                        
+                        // ✅ CRÍTICO: Preservar historial de pagos parciales
+                        pagos: cuota.pagos ? cuota.pagos.map(pago => ({
+                          fecha: pago.fecha,
+                          monto: pago.monto,
+                          diasAtraso: pago.diasAtraso || 0,
+                          tipo: pago.tipo
+                        })) : []
+                      };
+                    }) : []
                   };
+                  
+                  console.log('🔍 DESPUÉS DE CREAR - Operación cancelada:', operacionCancelada);
+                  console.log('🔍 DESPUÉS DE CREAR - Cuotas preservadas:', operacionCancelada.cuotas);
+                  
+                  // Verificar que se preservó el historial
+                  const cuotasConHistorial = operacionCancelada.cuotas.filter(c => c.fechaPago && c.fechaPago !== c.fechaVencimiento);
+                  console.log('🔍 CUOTAS CON FECHA DE PAGO REAL:', cuotasConHistorial.length);
+                  
+                  operacionCancelada.cuotas.forEach((cuota, index) => {
+                    console.log(`🔍 Cuota ${cuota.numero}: fechaPago="${cuota.fechaPago}", diasAtraso=${cuota.diasAtraso}`);
+                  });
                   
                   // Agregar a canceladas y quitar de activas
                   const nuevasActivas = currentPerson.operacionesActivas.filter((_, i) => i !== operacionIndex);
-                  const nuevasCanceladas = [...currentPerson.operacionesCanceladas, operacionCancelada];
+                  const nuevasCanceladas = [...(currentPerson.operacionesCanceladas || []), operacionCancelada];
                   
                   setCurrentPerson({
                     ...currentPerson,
@@ -1169,7 +1522,14 @@ const Dashboard = ({ currentUser, onLogout }) => {
                     operacionesCanceladas: nuevasCanceladas
                   });
                   
-                  alert('Operación movida a canceladas exitosamente');
+                  console.log('🔍 FINAL - Nuevas canceladas:', nuevasCanceladas);
+                  console.log('🔍 FINAL - Historial en última cancelada:', nuevasCanceladas[nuevasCanceladas.length - 1].cuotas);
+                  
+                  const mensaje = cuotasConHistorial.length > 0 
+                    ? `✅ Operación movida a canceladas con ${cuotasConHistorial.length} cuotas con historial de pagos preservado`
+                    : '✅ Operación movida a canceladas';
+                  
+                  alert(mensaje);
                 }}
               />
 
@@ -1198,7 +1558,8 @@ const Dashboard = ({ currentUser, onLogout }) => {
                   onClick={guardarPersona}
                   className="flex-1 bg-blue-600 text-white p-3 rounded"
                   disabled={!currentPerson.nombreCompleto || !currentPerson.nroDoc || 
-                           (currentPerson.idTipoDoc === '4' && !validarRUC(currentPerson.nroDoc))}
+                          !currentPerson.fechaRegistradaDireccion || !currentPerson.fechaInformadoTrabajo ||
+                          (currentPerson.idTipoDoc === '4' && !validarRUC(currentPerson.nroDoc))}
                 >
                   {isEditMode ? 'Actualizar' : 'Agregar'} Cliente
                 </button>

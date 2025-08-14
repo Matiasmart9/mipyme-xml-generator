@@ -118,16 +118,19 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
     let ultimaFechaPago = null;
 
     cuotas.forEach(cuota => {
-      if (cuota.diasAtraso > 0) {
+      // Si tiene días de atraso registrados, considerarlo como que tuvo atraso
+      if (cuota.diasAtraso && cuota.diasAtraso > 0) {
         tuvoAtraso = true;
       }
+      
+      // Buscar la última fecha de pago
       if (cuota.fechaPago && (!ultimaFechaPago || cuota.fechaPago > ultimaFechaPago)) {
         ultimaFechaPago = cuota.fechaPago;
       }
     });
 
     // Verificar si canceló anticipadamente
-    if (fechaCancelacion) {
+    if (fechaCancelacion && cuotas.length > 0) {
       const ultimaCuotaVencimiento = new Date(cuotas[cuotas.length - 1].fechaVencimiento);
       const fechaCancel = new Date(fechaCancelacion);
       if (fechaCancel < ultimaCuotaVencimiento) {
@@ -149,9 +152,12 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
     let cantidadCuotasConAtraso = 0;
 
     cuotas.forEach(cuota => {
-      if (cuota.diasAtraso > 0) {
-        diasAtrasoMaximo = Math.max(diasAtrasoMaximo, cuota.diasAtraso);
-        sumaDiasAtraso += cuota.diasAtraso;
+      // Para operaciones canceladas, usar el atraso registrado en cada cuota
+      const diasAtrasoEfectivo = cuota.diasAtraso || 0;
+      
+      if (diasAtrasoEfectivo > 0) {
+        diasAtrasoMaximo = Math.max(diasAtrasoMaximo, diasAtrasoEfectivo);
+        sumaDiasAtraso += diasAtrasoEfectivo;
         cantidadCuotasConAtraso++;
       }
     });
@@ -162,10 +168,21 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
     return { diasAtrasoMaximo, diasAtrasoPromedio };
   };
 
-  // Generar cuotas cuando cambian los parámetros
+  // Generar cuotas cuando cambian los parámetros (SOLO para operaciones nuevas)
   useEffect(() => {
+    // ✅ CRÍTICO: NO regenerar cuotas si estamos editando una operación existente
+    if (editingIndex !== null) {
+      console.log('🔍 EDITANDO - NO regenerar cuotas, mantener historial existente');
+      return; // Salir sin hacer nada si estamos editando
+    }
+
+    // Solo generar cuotas para operaciones nuevas
     if (operacionActual.plazoTotalEnPeriodos && 
-        operacionActual.capitalOriginal && operacionActual.fechaOperacion) {
+        operacionActual.capitalOriginal && operacionActual.fechaOperacion &&
+        parseInt(operacionActual.plazoTotalEnPeriodos) > 0 &&
+        parseFloat(operacionActual.capitalOriginal) > 0) {
+      
+      console.log('🔍 NUEVA OPERACIÓN - Generando cuotas automáticamente');
       const nuevasCuotas = generarCuotas(
         operacionActual.plazoTotalEnPeriodos,
         operacionActual.capitalOriginal,
@@ -173,9 +190,16 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
         operacionActual.fechaOperacion,
         operacionActual.idPeriodoPrestamo
       );
+      
       setOperacionActual(prev => ({
         ...prev,
         cuotas: nuevasCuotas
+      }));
+    } else {
+      // Si faltan datos, limpiar cuotas (solo para nuevas operaciones)
+      setOperacionActual(prev => ({
+        ...prev,
+        cuotas: []
       }));
     }
   }, [
@@ -183,14 +207,20 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
     operacionActual.capitalOriginal,
     operacionActual.interesOriginal,
     operacionActual.fechaOperacion,
-    operacionActual.idPeriodoPrestamo
+    operacionActual.idPeriodoPrestamo,
+    editingIndex // ✅ Agregar editingIndex como dependencia
   ]);
 
   // Actualizar métricas cuando cambian las cuotas o fecha de cancelación
   useEffect(() => {
     if (operacionActual.cuotas.length > 0) {
+      console.log('🔍 CALCULANDO MÉTRICAS - Cuotas actuales:', operacionActual.cuotas);
+      
       const metricas = calcularMetricasCancelada(operacionActual.cuotas);
       const tipoCancelacion = determinarTipoCancelacion(operacionActual.cuotas, operacionActual.fechaCancelacion);
+      
+      console.log('🔍 MÉTRICAS CALCULADAS:', metricas);
+      console.log('🔍 TIPO CANCELACIÓN:', tipoCancelacion);
       
       setOperacionActual(prev => ({
         ...prev,
@@ -199,7 +229,15 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
         idTipoCancelacion: tipoCancelacion
       }));
     }
-  }, [operacionActual.cuotas, operacionActual.fechaCancelacion]);
+  }, [
+    operacionActual.cuotas.length,
+    // ✅ CRÍTICO: Agregar dependencia de los días de atraso de cada cuota
+    JSON.stringify(operacionActual.cuotas.map(c => ({
+      diasAtraso: c.diasAtraso,
+      fechaPago: c.fechaPago
+    }))),
+    operacionActual.fechaCancelacion
+  ]);
 
   const resetOperacionActual = () => {
     setOperacionActual({
@@ -239,7 +277,72 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
     };
 
   const editarOperacion = (index) => {
-    setOperacionActual(operaciones[index]);
+    const operacionAEditar = operaciones[index];
+    console.log('🔍 EDITANDO - Operación original:', operacionAEditar);
+    console.log('🔍 EDITANDO - Cuotas a cargar:', operacionAEditar.cuotas);
+    
+    // ✅ CRÍTICO: Asegurar que las cuotas se carguen correctamente con TODO su historial
+    const operacionConCuotasCompletas = {
+      // Cargar TODOS los datos de la operación
+      id: operacionAEditar.id,
+      idTipoOperacion: operacionAEditar.idTipoOperacion,
+      fechaOperacion: operacionAEditar.fechaOperacion,
+      numeroOperacion: operacionAEditar.numeroOperacion,
+      capitalOriginal: operacionAEditar.capitalOriginal,
+      interesOriginal: operacionAEditar.interesOriginal || '',
+      plazoTotalEnPeriodos: operacionAEditar.plazoTotalEnPeriodos,
+      idPeriodoPrestamo: operacionAEditar.idPeriodoPrestamo,
+      fechaVencimiento: operacionAEditar.fechaVencimiento,
+      idMoneda: operacionAEditar.idMoneda,
+      
+      // Datos específicos de cancelación
+      idTipoCancelacion: operacionAEditar.idTipoCancelacion,
+      fechaCancelacion: operacionAEditar.fechaCancelacion,
+      diasAtrasoMaximo: operacionAEditar.diasAtrasoMaximo || 0,
+      diasAtrasoPromedio: operacionAEditar.diasAtrasoPromedio || 0,
+      montoQuitaMora: operacionAEditar.montoQuitaMora || '0.00',
+      montoQuitaInteres: operacionAEditar.montoQuitaInteres || '0.00',
+      montoQuitaCapital: operacionAEditar.montoQuitaCapital || '0.00',
+      montoInteresGenerado: operacionAEditar.montoInteresGenerado || '0.00',
+      
+      // ✅ CRÍTICO: Cargar cuotas con TODO su historial preservado
+      cuotas: operacionAEditar.cuotas ? operacionAEditar.cuotas.map(cuota => ({
+        numero: cuota.numero,
+        fechaVencimiento: cuota.fechaVencimiento,
+        montoCuota: cuota.montoCuota,
+        saldo: 0, // En canceladas todo está pagado
+        estado: 'pagado',
+        
+        // ✅ PRESERVAR fecha de pago EXACTA
+        fechaPago: cuota.fechaPago || '',
+        
+        // ✅ PRESERVAR días de atraso EXACTOS
+        diasAtraso: cuota.diasAtraso || 0,
+        
+        // ✅ PRESERVAR historial de pagos parciales
+        pagos: cuota.pagos ? cuota.pagos.map(pago => ({
+          fecha: pago.fecha,
+          monto: pago.monto,
+          diasAtraso: pago.diasAtraso || 0,
+          tipo: pago.tipo
+        })) : []
+      })) : []
+    };
+    
+    console.log('🔍 EDITANDO - Cuotas procesadas:', operacionConCuotasCompletas.cuotas);
+    
+    // Verificar que se cargó el historial
+    const cuotasConHistorial = operacionConCuotasCompletas.cuotas.filter(c => c.fechaPago || c.diasAtraso > 0);
+    console.log('🔍 EDITANDO - Cuotas con historial cargadas:', cuotasConHistorial.length);
+    
+    // Mostrar detalles del historial cargado
+    operacionConCuotasCompletas.cuotas.forEach((cuota, cuotaIndex) => {
+      if (cuota.fechaPago || cuota.diasAtraso > 0) {
+        console.log(`🔍 Cuota ${cuota.numero} cargada: Fecha Pago=${cuota.fechaPago}, Días Atraso=${cuota.diasAtraso}`);
+      }
+    });
+    
+    setOperacionActual(operacionConCuotasCompletas);
     setEditingIndex(index);
     setShowForm(true);
   };
@@ -250,10 +353,70 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
       return;
     }
 
+    console.log('🔍 GUARDANDO - Estado actual:', operacionActual);
+    console.log('🔍 GUARDANDO - Cuotas actuales:', operacionActual.cuotas);
+
+    // ✅ CRÍTICO: Crear operación completa preservando TODO el historial
     const operacionCompleta = {
-      ...operacionActual,
-      id: editingIndex !== null ? operaciones[editingIndex].id : Date.now()
+      // Todos los datos básicos de la operación
+      id: editingIndex !== null ? operaciones[editingIndex].id : Date.now(),
+      idTipoOperacion: operacionActual.idTipoOperacion,
+      fechaOperacion: operacionActual.fechaOperacion,
+      numeroOperacion: operacionActual.numeroOperacion,
+      capitalOriginal: operacionActual.capitalOriginal,
+      interesOriginal: operacionActual.interesOriginal || '',
+      plazoTotalEnPeriodos: operacionActual.plazoTotalEnPeriodos,
+      idPeriodoPrestamo: operacionActual.idPeriodoPrestamo,
+      fechaVencimiento: operacionActual.fechaVencimiento,
+      idMoneda: operacionActual.idMoneda,
+      
+      // Datos específicos de cancelación
+      idTipoCancelacion: operacionActual.idTipoCancelacion,
+      fechaCancelacion: operacionActual.fechaCancelacion,
+      diasAtrasoMaximo: operacionActual.diasAtrasoMaximo || 0,
+      diasAtrasoPromedio: operacionActual.diasAtrasoPromedio || 0,
+      montoQuitaMora: operacionActual.montoQuitaMora || '0.00',
+      montoQuitaInteres: operacionActual.montoQuitaInteres || '0.00',
+      montoQuitaCapital: operacionActual.montoQuitaCapital || '0.00',
+      montoInteresGenerado: operacionActual.montoInteresGenerado || '0.00',
+      
+      // ✅ CRÍTICO: Preservar las cuotas EXACTAMENTE como están con su historial
+      cuotas: operacionActual.cuotas ? operacionActual.cuotas.map(cuota => ({
+        numero: cuota.numero,
+        fechaVencimiento: cuota.fechaVencimiento,
+        montoCuota: cuota.montoCuota,
+        saldo: 0, // En canceladas todo está pagado
+        estado: 'pagado',
+        
+        // ✅ CRÍTICO: Preservar fecha de pago EXACTA
+        fechaPago: cuota.fechaPago || '', 
+        
+        // ✅ CRÍTICO: Preservar días de atraso EXACTOS
+        diasAtraso: cuota.diasAtraso || 0,
+        
+        // ✅ CRÍTICO: Preservar historial de pagos parciales si existe
+        pagos: cuota.pagos ? cuota.pagos.map(pago => ({
+          fecha: pago.fecha,
+          monto: pago.monto,
+          diasAtraso: pago.diasAtraso || 0,
+          tipo: pago.tipo
+        })) : []
+      })) : []
     };
+
+    console.log('🔍 OPERACIÓN COMPLETA CREADA:', operacionCompleta);
+    console.log('🔍 CUOTAS EN OPERACIÓN COMPLETA:', operacionCompleta.cuotas);
+    
+    // Verificar que se preservó el historial antes de guardar
+    const cuotasConHistorial = operacionCompleta.cuotas.filter(c => c.fechaPago || c.diasAtraso > 0);
+    console.log('🔍 CUOTAS CON HISTORIAL A GUARDAR:', cuotasConHistorial.length);
+    
+    // Mostrar detalles del historial
+    operacionCompleta.cuotas.forEach((cuota, index) => {
+      if (cuota.fechaPago || cuota.diasAtraso > 0) {
+        console.log(`🔍 Cuota ${cuota.numero}: Fecha Pago=${cuota.fechaPago}, Días Atraso=${cuota.diasAtraso}`);
+      }
+    });
 
     let nuevasOperaciones;
     if (editingIndex !== null) {
@@ -266,9 +429,18 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
       }
     }
 
+    console.log('🔍 NUEVAS OPERACIONES CANCELADAS:', nuevasOperaciones);
+
     onOperacionesChange(nuevasOperaciones);
     setShowForm(false);
     setEditingIndex(null);
+    
+    // Mensaje de confirmación con detalles
+    const mensaje = cuotasConHistorial.length > 0 
+      ? `✅ Operación cancelada guardada con ${cuotasConHistorial.length} cuotas con historial de pagos`
+      : '✅ Operación cancelada guardada';
+    
+    alert(mensaje);
   };
 
   const eliminarOperacion = (index) => {
@@ -542,6 +714,16 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
                   <h4 className="font-medium mb-3 text-blue-700">
                     Historial de Pagos de la Operación Cancelada ({operacionActual.cuotas.length} cuotas)
                   </h4>
+                  
+                  {/* Información del resumen */}
+                  <div className="mb-3 text-sm text-blue-700 bg-white p-2 rounded">
+                    <p><strong>Resumen de la operación:</strong></p>
+                    <p>• Capital: Gs. {formatearMonto(operacionActual.capitalOriginal || 0)}</p>
+                    <p>• Interés: Gs. {formatearMonto(operacionActual.interesOriginal || 0)}</p>
+                    <p>• Cuota: Gs. {formatearMonto(operacionActual.cuotas[0]?.montoCuota || 0)}</p>
+                    <p>• Tipo cancelación: <strong>{tiposCancelacion.find(t => t.id === operacionActual.idTipoCancelacion)?.label}</strong></p>
+                  </div>
+                  
                   <div className="max-h-60 overflow-y-auto">
                     <table className="w-full text-xs">
                       <thead>
@@ -549,7 +731,7 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
                           <th className="p-2 text-left">Cuota</th>
                           <th className="p-2 text-left">Vencimiento</th>
                           <th className="p-2 text-right">Monto</th>
-                          <th className="p-2 text-left">F. Pago</th>
+                          <th className="p-2 text-left">F. Pago *</th>
                           <th className="p-2 text-center">Días Atraso</th>
                         </tr>
                       </thead>
@@ -590,9 +772,17 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
                                     ...cuota,
                                     diasAtraso: parseInt(e.target.value) || 0
                                   };
+                                  
+                                  // ✅ AGREGAR: Recalcular métricas inmediatamente
+                                  const metricas = calcularMetricasCancelada(nuevasCuotas);
+                                  const tipoCancelacion = determinarTipoCancelacion(nuevasCuotas, operacionActual.fechaCancelacion);
+                                  
                                   setOperacionActual(prev => ({
                                     ...prev,
-                                    cuotas: nuevasCuotas
+                                    cuotas: nuevasCuotas,
+                                    diasAtrasoMaximo: metricas.diasAtrasoMaximo,
+                                    diasAtrasoPromedio: metricas.diasAtrasoPromedio,
+                                    idTipoCancelacion: tipoCancelacion
                                   }));
                                 }}
                                 className="w-16 p-1 border rounded text-xs text-center"
@@ -607,10 +797,11 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
                   </div>
                   
                   <div className="mt-3 text-xs text-gray-600 bg-white p-2 rounded">
-                    <p><strong>Instrucciones:</strong></p>
+                    <p><strong>Instrucciones para operación cancelada:</strong></p>
                     <ul className="list-disc list-inside mt-1 space-y-1">
                       <li>Ingrese la fecha real de pago para cada cuota</li>
                       <li>Los días de atraso se calculan automáticamente, pero puede ajustarlos</li>
+                      <li>Estos datos se usan para calcular el <strong>Atraso Máximo</strong> y <strong>Atraso Promedio</strong></li>
                       <li>El tipo de cancelación se determina automáticamente según los atrasos</li>
                       <li>La fecha de cancelación debería ser la fecha del último pago realizado</li>
                     </ul>
@@ -635,12 +826,25 @@ const OperacionesCanceladas = ({ operaciones, onOperacionesChange, clienteId, gl
                     </div>
                     <div>
                       <span className="text-gray-600">Atraso Máximo:</span>
-                      <span className="ml-1 font-medium">{operacionActual.diasAtrasoMaximo} días</span>
+                      <span className={`ml-1 font-medium ${operacionActual.diasAtrasoMaximo > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {operacionActual.diasAtrasoMaximo} días
+                      </span>
                     </div>
                     <div>
                       <span className="text-gray-600">Atraso Promedio:</span>
-                      <span className="ml-1 font-medium">{operacionActual.diasAtrasoPromedio} días</span>
+                      <span className={`ml-1 font-medium ${operacionActual.diasAtrasoPromedio > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                        {operacionActual.diasAtrasoPromedio} días
+                      </span>
                     </div>
+                  </div>
+                  
+                  {/* Preview de cómo aparecerá en el XML */}
+                  <div className="mt-3 bg-yellow-50 p-2 rounded">
+                    <p className="text-xs text-yellow-800"><strong>Preview XML:</strong></p>
+                    <p className="text-xs font-mono text-yellow-700">
+                      DiasAtrasoMaximo="{operacionActual.diasAtrasoMaximo}" 
+                      DiasAtrasoPromedio="{operacionActual.diasAtrasoPromedio}"
+                    </p>
                   </div>
                 </div>
               )}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, AlertTriangle, DollarSign, Clock, ChevronDown, Eye, CreditCard, CheckCircle } from 'lucide-react';
+import { Plus, Trash2, Calendar, AlertTriangle, DollarSign, Edit, Clock, ChevronDown, Eye, CreditCard, CheckCircle } from 'lucide-react';
 
 const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globalOperationCounter = 1, onUpdateGlobalCounter, onMoverACancelada }) => {
   const [showForm, setShowForm] = useState(false);
@@ -71,10 +71,16 @@ const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globa
 
   // Generar cuotas automáticamente
   const generarCuotas = (plazoTotal, capitalOriginal, interesOriginal, fechaInicio, periodo) => {
-    if (!plazoTotal || !capitalOriginal || !fechaInicio) return [];
+    // ✅ NO generar cuotas si faltan datos esenciales
+    if (!plazoTotal || !capitalOriginal || !fechaInicio || 
+        plazoTotal <= 0 || capitalOriginal <= 0) {
+      return [];
+    }
 
     const cuotas = [];
-    const montoCuota = Math.round((parseFloat(capitalOriginal) + parseFloat(interesOriginal || 0)) / parseInt(plazoTotal));
+    const capitalNum = parseFloat(capitalOriginal);
+    const interesNum = parseFloat(interesOriginal || 0);
+    const montoCuota = Math.round((capitalNum + interesNum) / parseInt(plazoTotal));
     const fechaBase = new Date(fechaInicio);
 
     for (let i = 1; i <= parseInt(plazoTotal); i++) {
@@ -205,7 +211,11 @@ const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globa
   // Generar cuotas cuando cambian los parámetros
   useEffect(() => {
     if (operacionActual.plazoTotalEnPeriodos && 
-        operacionActual.capitalOriginal && operacionActual.fechaOperacion) {
+        operacionActual.capitalOriginal && 
+        operacionActual.fechaOperacion &&
+        parseInt(operacionActual.plazoTotalEnPeriodos) > 0 &&
+        parseFloat(operacionActual.capitalOriginal) > 0) {
+      
       const nuevasCuotas = generarCuotas(
         operacionActual.plazoTotalEnPeriodos,
         operacionActual.capitalOriginal,
@@ -213,9 +223,16 @@ const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globa
         operacionActual.fechaOperacion,
         operacionActual.idPeriodoPrestamo
       );
+      
       setOperacionActual(prev => ({
         ...prev,
         cuotas: actualizarEstadosCuotas(nuevasCuotas)
+      }));
+    } else {
+      // ✅ Si faltan datos, limpiar cuotas
+      setOperacionActual(prev => ({
+        ...prev,
+        cuotas: []
       }));
     }
   }, [
@@ -229,21 +246,20 @@ const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globa
   // Actualizar métricas cuando cambian las cuotas
   useEffect(() => {
     if (operacionActual.cuotas.length > 0) {
-      const cuotasActualizadas = actualizarEstadosCuotas(operacionActual.cuotas);
-      const metricas = calcularMetricasAtraso(cuotasActualizadas);
-      const capitalAdeudado = calcularCapitalAdeudado(cuotasActualizadas);
+      const metricas = calcularMetricasAtraso(operacionActual.cuotas);
+      const capitalAdeudado = calcularCapitalAdeudado(operacionActual.cuotas);
       
+      // Solo actualizar las métricas, NO las cuotas
       setOperacionActual(prev => ({
         ...prev,
-        cuotas: cuotasActualizadas,
         capitalAdeudadoActual: capitalAdeudado,
         diasAtraso: metricas.diasAtraso,
         diasAtrasoMaximo: metricas.diasAtrasoMaximo,
         diasAtrasoPromedio: metricas.diasAtrasoPromedio,
-        plazoRemanenteEnPeriodos: cuotasActualizadas.filter(c => c.saldo > 0).length
+        plazoRemanenteEnPeriodos: prev.cuotas.filter(c => c.saldo > 0).length
       }));
     }
-  }, [operacionActual.cuotas.length, operacionActual.cuotas]);
+  }, [operacionActual.cuotas.length]);
 
   // Forzar actualización de métricas cada vez que se monta el componente
   useEffect(() => {
@@ -292,7 +308,7 @@ const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globa
       fechaVencimiento: '',
       idMoneda: 'PYG',
       idTipoTitular: '1',
-      cuotas: [],
+      cuotas: [], // ✅ Siempre iniciar vacío
       capitalAdeudadoActual: '',
       interesPendienteDeDevengar: '',
       capitalAtrasado: '0',
@@ -570,7 +586,7 @@ const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globa
                     className="text-blue-500 p-1"
                     title="Editar"
                   >
-                    <Clock size={16} />
+                    <Edit size={16} />
                   </button>
                   {operacion.capitalAdeudadoActual === 0 && onMoverACancelada && (
                     <button
@@ -696,7 +712,7 @@ const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globa
                 </div>
               )}
 
-<div>
+                <div>
                 <label className="block text-sm font-medium mb-1">Fecha de Pago *</label>
                 <input
                   type="date"
@@ -892,7 +908,7 @@ const OperacionesActivas = ({ operaciones, onOperacionesChange, clienteId, globa
                   <h4 className={`font-medium mb-3 ${tipoOperacion === 'nueva' ? 'text-green-700' : 'text-blue-700'}`}>
                     {tipoOperacion === 'nueva' ? 
                       `Vista Previa del Cuotero (${operacionActual.cuotas.length} cuotas)` :
-                      `Marcar Pagos Realizados (${operacionActual.cuotas.length} cuotas)`
+                      `Marcar Pagos Realizados (Solo si vas a cambiar F. Pago Tocar) (${operacionActual.cuotas.length} cuotas)`
                     }
                   </h4>
                   <div className="max-h-60 overflow-y-auto">
