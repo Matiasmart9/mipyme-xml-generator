@@ -128,24 +128,25 @@ const Dashboard = ({ currentUser, onLogout }) => {
   ];
 
   const departamentos = [
+    { id: '00', label: 'Sin especificar' },
     { id: '0', label: 'Asunción' },
-    { id: '17', label: 'Alto Paraguay' },
-    { id: '10', label: 'Alto Paraná' },
-    { id: '13', label: 'Amambay' },
-    { id: '16', label: 'Boquerón' },
+    { id: '1', label: 'Concepción' },
+    { id: '2', label: 'San Pedro' },
+    { id: '3', label: 'Cordillera' },
+    { id: '4', label: 'Guairá' },
     { id: '5', label: 'Caaguazú' },
     { id: '6', label: 'Caazapá' },
-    { id: '14', label: 'Canindeyú' },
-    { id: '11', label: 'Central' },
-    { id: '1', label: 'Concepción' },
-    { id: '4', label: 'Guairá' },
     { id: '7', label: 'Itapúa' },
-    { id: '3', label: 'Cordillera' },
     { id: '8', label: 'Misiones' },
-    { id: '12', label: 'Ñeembucú' },
     { id: '9', label: 'Paraguarí' },
+    { id: '10', label: 'Alto Paraná' },
+    { id: '11', label: 'Central' },
+    { id: '12', label: 'Ñeembucú' },
+    { id: '13', label: 'Amambay' },
+    { id: '14', label: 'Canindeyú' },
     { id: '15', label: 'Presidente Hayes' },
-    { id: '2', label: 'San Pedro' }
+    { id: '16', label: 'Boquerón' },    
+    { id: '17', label: 'Alto Paraguay' }
   ];
 
   const validarRUC = (ruc) => {
@@ -190,7 +191,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
       direccion: '',
       ciudad: '',
       barrio: '',
-      departamento: '0', // Asunción por defecto
+      departamento: '00', // Sin Especificar por defecto
       telefono: '',
       cargoTrabajo: '',
       salario: '',
@@ -312,7 +313,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
       return;
     }
 
-    if (!currentPerson.departamento || currentPerson.departamento === '0') {
+    if (!currentPerson.departamento || currentPerson.departamento === '00') {
       alert('El departamento es obligatorio');
       return;
     }
@@ -823,7 +824,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
   return (
     <div className="max-w-md mx-auto bg-white min-h-screen">
         {/* Header */}
-        <div className="bg-blue-600 text-white p-4">
+        <div className="bg-orange-400 text-white p-4">
         <div className="flex justify-between items-center">
             <div>
             <h1 className="text-lg font-bold">Generador XML MiPymes</h1>
@@ -860,7 +861,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
       <div className="p-4 bg-green-50 border-b">
         <button
           onClick={nuevoCliente}
-          className="w-full bg-green-600 text-white p-3 rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 transition-colors"
+          className="w-full bg-green-500 text-white p-3 rounded-lg font-semibold flex items-center justify-center hover:bg-green-700 transition-colors"
         >
           <Plus className="mr-2" size={20} />
           Nuevo Cliente
@@ -880,19 +881,19 @@ const Dashboard = ({ currentUser, onLogout }) => {
           />
           <button
             onClick={buscarCliente}
-            className="bg-blue-500 text-white px-4 py-2 rounded"
+            className="bg-orange-500 text-white px-4 py-2 rounded"
             disabled={!searchDoc.trim()}
           >
             <Search size={20} />
           </button>
         </div>
         <p className="text-xs text-gray-600 mt-1">
-          Buscar cliente existente para editar
+          Buscar cliente existente para editar o registrar pago
         </p>
       </div>
 
       {/* Lista de Personas */}
-      <div className="p-4">
+      <div className="p-4 pb-20">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold flex items-center">
             <User className="mr-2" size={20} />
@@ -919,20 +920,23 @@ const Dashboard = ({ currentUser, onLogout }) => {
                   </span>
                 )}
               </p>
-                <div className="mt-2 flex flex-wrap gap-1 text-xs">
-                  <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                    {persona.idTipoPersona === '1' ? 'Física' : 'Jurídica'}
-                  </span>
-                  <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
-                    {sectoresEconomicos.find(s => s.id === persona.idSectorEconomico)?.label}
-                  </span>
-                  <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                    Contactos: {persona.contactos.length}
-                  </span>
-                  <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
-                    Op. Activas: {persona.operacionesActivas.length}
-                  </span>
-                </div>
+<div className="mt-2 flex flex-wrap gap-1 text-xs">
+  <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded">
+    {persona.idTipoPersona === '1' ? 'Física' : 'Jurídica'}
+  </span>
+  <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
+    {sectoresEconomicos.find(s => s.id === persona.idSectorEconomico)?.label}
+  </span>
+  <span className="bg-orange-100 text-orange-800 px-2 py-1 rounded">
+    Contactos: {persona.contactos.length}
+  </span>
+  <span className="bg-red-100 text-red-800 px-2 py-1 rounded">
+    Activas: {persona.operacionesActivas.length}
+  </span>
+  <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded">
+    Canceladas: {persona.operacionesCanceladas?.length || 0}
+  </span>
+</div>
               </div>
               <div className="flex space-x-1">
                 <button
@@ -984,7 +988,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
       {showPersonForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 overflow-y-auto">
           <div className="bg-white m-2 mt-4 rounded-lg max-h-screen overflow-y-auto">
-            <div className="sticky top-0 bg-blue-600 text-white p-4 rounded-t-lg">
+            <div className="sticky top-0 bg-orange-400 text-white p-4 rounded-t-lg">
               <h2 className="text-lg font-bold">
                 {isEditMode ? 'Editar Cliente' : 'Agregar Cliente'}
               </h2>
@@ -993,10 +997,10 @@ const Dashboard = ({ currentUser, onLogout }) => {
               </p>
             </div>
             
-            <div className="p-4 space-y-6">
+            <div className="p-4 pt-5 space-y-6">
               {/* Agregar Datos Cliente */}
               <div className="border rounded-lg p-4">
-                <h3 className="font-semibold text-blue-600 mb-3 border-b pb-2">
+                <h3 className="font-semibold text-blue-800 mb-3 border-b pb-2">
                   Agregar Datos Cliente
                 </h3>
                 
@@ -1202,9 +1206,9 @@ const Dashboard = ({ currentUser, onLogout }) => {
 
               {/* Contactos */}
               <div className="border rounded-lg p-4">
-                <h3 className="font-semibold text-purple-600 mb-3 border-b pb-2">
+                <h3 className="font-semibold text-blue-700 mb-3 border-b pb-2">
                   Contactos del Cliente *
-                  <span className="text-xs font-normal text-gray-600 ml-2">(Al menos uno requerido)</span>
+                  <span className="text-xs font-normal text-red-600 ml-2">(Al menos uno requerido)</span>
                 </h3>
                 
                 {/* Lista de contactos */}
@@ -1252,7 +1256,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
                   </div>
                   <button
                     onClick={agregarContacto}
-                    className="w-full bg-purple-500 text-white p-2 rounded text-sm"
+                    className="w-full bg-cyan-500 text-white p-2 rounded text-sm"
                     disabled={!newContact.contacto.trim()}
                   >
                     <Plus className="inline mr-1" size={14} />
@@ -1542,27 +1546,29 @@ const Dashboard = ({ currentUser, onLogout }) => {
                 onUpdateGlobalCounter={() => setGlobalOperationCounter(prev => prev + 1)}
               />
 
-              {/* Botones de Acción */}
-              <div className="flex space-x-3 pt-4 border-t">
-                <button
-                  onClick={() => {
-                    setShowPersonForm(false);
-                    setIsEditMode(false);
-                    setEditingPersonId(null);
-                  }}
-                  className="flex-1 bg-gray-300 text-gray-700 p-3 rounded"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={guardarPersona}
-                  className="flex-1 bg-blue-600 text-white p-3 rounded"
-                  disabled={!currentPerson.nombreCompleto || !currentPerson.nroDoc || 
-                          !currentPerson.fechaRegistradaDireccion || !currentPerson.fechaInformadoTrabajo ||
-                          (currentPerson.idTipoDoc === '4' && !validarRUC(currentPerson.nroDoc))}
-                >
-                  {isEditMode ? 'Actualizar' : 'Agregar'} Cliente
-                </button>
+              {/* Botones de Acción - Sticky con sombra */}
+              <div className="sticky bottom-0 bg-white border-t pt-4 pb-4 mt-4 shadow-lg">
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowPersonForm(false);
+                      setIsEditMode(false);
+                      setEditingPersonId(null);
+                    }}
+                    className="flex-1 bg-gray-300 text-gray-700 p-3 rounded hover:bg-gray-400 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarPersona}
+                    className="flex-1 bg-orange-600 text-white p-3 rounded hover:bg-orange-700 transition-colors"
+                    disabled={!currentPerson.nombreCompleto || !currentPerson.nroDoc || 
+                            !currentPerson.fechaRegistradaDireccion || !currentPerson.fechaInformadoTrabajo ||
+                            (currentPerson.idTipoDoc === '4' && !validarRUC(currentPerson.nroDoc))}
+                  >
+                    {isEditMode ? 'Actualizar' : 'Agregar'} Cliente
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1574,7 +1580,7 @@ const Dashboard = ({ currentUser, onLogout }) => {
         <div className="fixed bottom-4 left-4 right-4">
           <button
             onClick={generarXML}
-            className="w-full bg-green-600 text-white p-4 rounded-lg shadow-lg flex items-center justify-center"
+            className="w-full bg-cyan-600 text-white p-4 rounded-lg shadow-lg flex items-center justify-center"
           >
             <Download className="mr-2" size={20} />
             Generar XML ({personas.length} cliente{personas.length !== 1 ? 's' : ''})

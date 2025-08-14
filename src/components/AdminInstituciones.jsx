@@ -493,24 +493,25 @@ const AdminInstituciones = ({ currentUser, onLogout }) => {
   // Funciones auxiliares para el Excel
   const getDepartamentoLabel = (departamentoId) => {
     const departamentos = [
-      { id: '0', label: 'Sin especificar' },
-      { id: '1', label: 'Alto Paraguay' },
-      { id: '2', label: 'Alto Paraná' },
-      { id: '3', label: 'Amambay' },
-      { id: '4', label: 'Boquerón' },
+      { id: '00', label: 'Sin especificar' },
+      { id: '0', label: 'Asunción' },
+      { id: '1', label: 'Concepción' },
+      { id: '2', label: 'San Pedro' },
+      { id: '3', label: 'Cordillera' },
+      { id: '4', label: 'Guairá' },
       { id: '5', label: 'Caaguazú' },
       { id: '6', label: 'Caazapá' },
-      { id: '7', label: 'Canindeyú' },
-      { id: '8', label: 'Central' },
-      { id: '9', label: 'Concepción' },
-      { id: '10', label: 'Guairá' },
-      { id: '11', label: 'Itapúa' },
-      { id: '12', label: 'Cordillera' },
-      { id: '13', label: 'Misiones' },
-      { id: '14', label: 'Ñeembucú' },
-      { id: '15', label: 'Paraguarí' },
-      { id: '16', label: 'Presidente Hayes' },
-      { id: '17', label: 'San Pedro' }
+      { id: '7', label: 'Itapúa' },
+      { id: '8', label: 'Misiones' },
+      { id: '9', label: 'Paraguarí' },
+      { id: '10', label: 'Alto Paraná' },
+      { id: '11', label: 'Central' },
+      { id: '12', label: 'Ñeembucú' },
+      { id: '13', label: 'Amambay' },
+      { id: '14', label: 'Canindeyú' },
+      { id: '15', label: 'Presidente Hayes' },
+      { id: '16', label: 'Boquerón' },    
+      { id: '17', label: 'Alto Paraguay' }
     ];
     return departamentos.find(d => d.id === departamentoId)?.label || 'Sin especificar';
   };
